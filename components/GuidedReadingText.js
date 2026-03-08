@@ -23,6 +23,8 @@ export default function GuidedReadingText({ story, activeWordIndex, fontScale, h
     return grouped;
   }, [story]);
 
+  const activeWordClass = highContrast ? 'bg-leiae-accent text-leiae-bg' : 'bg-leiae-accent text-leiae-bg';
+
   return (
     <div className='mt-4 space-y-5 leading-relaxed' style={{ fontSize: `${fontScale}rem` }}>
       {wordsByParagraph.map((palavras, paragraphIndex) => (
@@ -31,16 +33,15 @@ export default function GuidedReadingText({ story, activeWordIndex, fontScale, h
             const isActive = palavra.indice === activeWordIndex;
 
             return (
-              <span
-                key={`${story.id}-word-${palavra.indice}-${wordPosition}`}
-                className={
-                  isActive
-                    ? `rounded-md bg-leiae-accent px-1.5 py-0.5 font-semibold ${highContrast ? 'text-leiae-bg' : 'text-leiae-bg'}`
-                    : 'text-inherit'
-                }
-              >
-                {palavra.texto}
-                {wordPosition < palavras.length - 1 ? ' ' : ''}
+              <span key={`${story.id}-word-${palavra.indice}-${wordPosition}`}>
+                <span
+                  className={`inline-block rounded-md px-[0.22em] py-[0.06em] leading-[1.45] transition-colors duration-150 ${
+                    isActive ? activeWordClass : 'bg-transparent text-inherit'
+                  }`}
+                >
+                  {palavra.texto}
+                </span>
+                {wordPosition < palavras.length - 1 ? <span className='whitespace-pre'> </span> : null}
               </span>
             );
           })}

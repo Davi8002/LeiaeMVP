@@ -236,6 +236,7 @@ export default function LeituraPage() {
               <SpeechSynthesisPlayer
                 text={story.textoNarracao}
                 words={story.palavras}
+                activeWordIndex={guidedWordIndex}
                 onWordBoundary={setGuidedWordIndex}
                 onPlayStateChange={setSpeechPlaying}
               />
@@ -257,3 +258,4 @@ export default function LeituraPage() {
     </>
   );
 }
+

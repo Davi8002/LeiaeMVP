@@ -49,13 +49,13 @@ export default function AppShell({
 
             <div className='flex items-center gap-3'>
               <div
-                className={`rounded-xl px-2 py-1 ${
+                className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-full ${
                   darkHeader
-                    ? 'border border-leiae-bg/40 bg-leiae-bg/95 shadow-sm'
-                    : 'border border-leiae-dark/15 bg-leiae-bg/75'
+                    ? 'border border-leiae-bg/45 bg-leiae-bg shadow-sm'
+                    : 'border border-leiae-dark/20 bg-white'
                 }`}
               >
-                <Logo onDark={darkHeader} className='h-auto w-[92px] sm:w-[108px]' priority />
+                <Logo onDark={darkHeader} className='h-9 w-9 rounded-full object-contain sm:h-10 sm:w-10' priority />
               </div>
               <div>
                 <p className='font-display text-lg font-bold leading-tight sm:text-xl'>{title}</p>
