@@ -407,7 +407,7 @@ export default function SpeechSynthesisPlayer({
         pauseAfterStartRef.current = false;
         userPausedRef.current = false;
         setStatus('idle');
-        setSpeechError('Não foi possível reproduzir a voz automática neste navegador.');
+        setSpeechError('NÃ£o foi possÃ­vel reproduzir a voz automÃ¡tica neste navegador.');
         onPlayStateChange?.(false);
       };
 
@@ -745,7 +745,7 @@ export default function SpeechSynthesisPlayer({
   if (!supported) {
     return (
       <section className='rounded-3xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card'>
-        <p className='text-sm font-semibold text-leiae-dark/80'>Leitura em voz do navegador não suportada neste dispositivo.</p>
+        <p className='text-sm font-semibold text-leiae-dark/80'>Leitura em voz do navegador nÃ£o suportada neste dispositivo.</p>
       </section>
     );
   }
@@ -768,7 +768,7 @@ export default function SpeechSynthesisPlayer({
           onClick={isPlaying ? handlePause : handlePlay}
           disabled={!canUse}
           className='inline-flex h-12 w-12 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg shadow transition-all duration-200 hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:w-14'
-          aria-label={isPlaying ? 'Pausar leitura automática' : 'Iniciar leitura automática'}
+          aria-label={isPlaying ? 'Pausar leitura automÃ¡tica' : 'Iniciar leitura automÃ¡tica'}
         >
           {isPlaying ? <PauseIcon /> : <PlayIcon />}
         </button>
@@ -778,7 +778,7 @@ export default function SpeechSynthesisPlayer({
           onClick={() => handleJump(8)}
           disabled={!canUse}
           className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 sm:h-11 sm:w-11'
-          aria-label='Avançar leitura'
+          aria-label='AvanÃ§ar leitura'
         >
           <ForwardIcon />
         </button>
@@ -836,7 +836,7 @@ export default function SpeechSynthesisPlayer({
             {voiceRate.toFixed(1)}x
           </span>
           {isSeeking ? (
-            <span className='rounded-full bg-leiae-accent/15 px-3 py-1 text-xs font-semibold text-leiae-dark'>Ajustando posição...</span>
+            <span className='rounded-full bg-leiae-accent/15 px-3 py-1 text-xs font-semibold text-leiae-dark'>Ajustando posiÃ§Ã£o...</span>
           ) : null}
         </div>
       </div>
@@ -856,7 +856,7 @@ export default function SpeechSynthesisPlayer({
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div>
           <h2 className='font-display text-lg font-bold text-leiae-dark'>Player de leitura robotizada</h2>
-          <p className='text-sm text-leiae-text/75'>Controle a leitura como em um player de áudio/vídeo</p>
+          <p className='text-sm text-leiae-text/75'>Controle a leitura como em um player de Ã¡udio/vÃ­deo</p>
         </div>
 
         <span className='inline-flex items-center gap-2 rounded-full border border-leiae-dark/10 bg-white/80 px-3 py-1 text-xs font-semibold text-leiae-dark/80'>

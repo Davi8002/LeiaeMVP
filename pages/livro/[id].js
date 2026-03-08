@@ -111,7 +111,7 @@ function buildPageRanges(words) {
     if (!isLastChunk) {
       const searchStart = Math.max(start + minWordsPerPage - 1, start);
       for (let i = end; i >= searchStart; i -= 1) {
-        if (/[.!?Ö]$/.test(words[i].texto)) {
+        if (/[.!?‚Ä¶]$/.test(words[i].texto)) {
           end = i;
           break;
         }
@@ -176,7 +176,7 @@ export default function LeituraPage() {
   }, [guidedPlaying]);
 
   const totalWords = story?.palavras?.length ?? 1;
-  const pageTitle = story ? `${story.titulo} | Leia ` : 'Leitura | Leia ';
+  const pageTitle = story ? `${story.titulo} | Leia√ä` : 'Leitura | Leia√ä';
 
   const roboticVoiceActive = voiceMode === 'robotic';
   const showSidePanel = !controlsCollapsed;
@@ -336,7 +336,7 @@ export default function LeituraPage() {
         await document.exitFullscreen?.();
       }
     } catch (_error) {
-      // Ignora erro de permiss„o/ambiente.
+      // Ignora erro de permiss√£o/ambiente.
     }
   };
 
@@ -435,13 +435,13 @@ export default function LeituraPage() {
       <>
         <Head>
           <meta charSet='UTF-8' />
-          <title>Leitura | Leia </title>
-          <meta name='description' content='Tela de leitura acessÌvel do Leia .' />
+          <title>Leitura | Leia√ä</title>
+          <meta name='description' content='Tela de leitura acess√≠vel do Leia√ä.' />
         </Head>
 
         <main className='flex min-h-screen items-center justify-center bg-leiae-bg px-6 text-center text-leiae-dark'>
           <div>
-            <p className='text-xl font-semibold'>HistÛria n„o encontrada.</p>
+            <p className='text-xl font-semibold'>Hist√≥ria n√£o encontrada.</p>
             <Link href='/biblioteca' className='mt-5 inline-flex rounded-xl bg-leiae-accent px-5 py-3 font-bold text-leiae-bg'>
               Voltar para biblioteca
             </Link>
@@ -464,11 +464,11 @@ export default function LeituraPage() {
       <Head>
         <meta charSet='UTF-8' />
         <title>{pageTitle}</title>
-        <meta name='description' content={`Leitura da histÛria ${story.titulo} no Leia .`} />
+        <meta name='description' content={`Leitura da hist√≥ria ${story.titulo} no Leia√ä.`} />
       </Head>
 
       <AppShell
-        title='Leia '
+        title='Leia√ä'
         subtitle='Modo leitura'
         activeTab='leitura'
         darkHeader
@@ -549,8 +549,8 @@ export default function LeituraPage() {
                       onClick={() => handleQuickJump(3)}
                       disabled={quickDisabled}
                       className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-                      aria-label='AvanÁar 3 palavras'
-                      title='AvanÁar 3 palavras'
+                      aria-label='Avan√ßar 3 palavras'
+                      title='Avan√ßar 3 palavras'
                     >
                       <QuickForwardIcon />
                     </button>
@@ -581,13 +581,13 @@ export default function LeituraPage() {
                     onClick={() => navigatePage(-1)}
                     disabled={currentPageIndex <= 0}
                     className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-                    aria-label='P·gina anterior'
+                    aria-label='P√°gina anterior'
                   >
                     <ArrowIcon direction='left' />
                   </button>
 
                   <span className='rounded-full bg-leiae-dark/10 px-3 py-1 text-xs font-semibold text-leiae-dark/75'>
-                    P·gina {currentPageIndex + 1}/{pageRanges.length}
+                    P√°gina {currentPageIndex + 1}/{pageRanges.length}
                   </span>
 
                   <button
@@ -595,7 +595,7 @@ export default function LeituraPage() {
                     onClick={() => navigatePage(1)}
                     disabled={currentPageIndex >= pageRanges.length - 1}
                     className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-                    aria-label='PrÛxima p·gina'
+                    aria-label='Pr√≥xima p√°gina'
                   >
                     <ArrowIcon direction='right' />
                   </button>
@@ -681,7 +681,7 @@ export default function LeituraPage() {
                   />
                 ) : (
                   <div className='rounded-2xl border border-leiae-dark/10 bg-white/80 px-3 py-2 text-center text-xs font-semibold text-leiae-dark/75'>
-                    Leitura humanizada ainda n„o disponÌvel.
+                    Leitura humanizada ainda n√£o dispon√≠vel.
                   </div>
                 )}
               </div>
