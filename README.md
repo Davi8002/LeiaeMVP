@@ -1,4 +1,4 @@
-# Leia� MVP
+# Leiae MVP
 
 MVP web responsivo em Next.js + React + Tailwind CSS.
 
