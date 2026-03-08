@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds)) return '0:00';
@@ -26,7 +26,13 @@ function PauseIcon() {
   );
 }
 
-export default function AudioPlayer({ src, title }) {
+export default function AudioPlayer({
+  src,
+  title,
+  onTimeUpdate,
+  onPlayStateChange,
+  onDurationChange,
+}) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -37,20 +43,43 @@ export default function AudioPlayer({ src, title }) {
     const audio = audioRef.current;
     if (!audio) return undefined;
 
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    const onEnded = () => setPlaying(false);
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime || 0);
-    const onLoadedMetadata = () => setDuration(audio.duration || 0);
+    const onPlay = () => {
+      setPlaying(true);
+      onPlayStateChange?.(true);
+    };
+
+    const onPause = () => {
+      setPlaying(false);
+      onPlayStateChange?.(false);
+    };
+
+    const onEnded = () => {
+      setPlaying(false);
+      onPlayStateChange?.(false);
+    };
+
+    const onAudioTimeUpdate = () => {
+      const nextTime = audio.currentTime || 0;
+      setCurrentTime(nextTime);
+      onTimeUpdate?.(nextTime);
+    };
+
+    const onLoadedMetadata = () => {
+      const nextDuration = audio.duration || 0;
+      setDuration(nextDuration);
+      onDurationChange?.(nextDuration);
+    };
+
     const onError = () => {
       setAudioError(true);
       setPlaying(false);
+      onPlayStateChange?.(false);
     };
 
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('ended', onEnded);
-    audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.addEventListener('timeupdate', onAudioTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('error', onError);
 
@@ -58,22 +87,26 @@ export default function AudioPlayer({ src, title }) {
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.removeEventListener('timeupdate', onAudioTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('error', onError);
     };
-  }, []);
+  }, [onDurationChange, onPlayStateChange, onTimeUpdate]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+
     audio.pause();
     audio.currentTime = 0;
     setPlaying(false);
     setCurrentTime(0);
     setDuration(0);
     setAudioError(false);
-  }, [src]);
+    onPlayStateChange?.(false);
+    onTimeUpdate?.(0);
+    onDurationChange?.(0);
+  }, [onDurationChange, onPlayStateChange, onTimeUpdate, src]);
 
   const togglePlay = async () => {
     const audio = audioRef.current;
@@ -83,12 +116,15 @@ export default function AudioPlayer({ src, title }) {
       try {
         await audio.play();
         setPlaying(true);
+        onPlayStateChange?.(true);
       } catch (_error) {
         setPlaying(false);
+        onPlayStateChange?.(false);
       }
     } else {
       audio.pause();
       setPlaying(false);
+      onPlayStateChange?.(false);
     }
   };
 
@@ -101,7 +137,7 @@ export default function AudioPlayer({ src, title }) {
     <section className='rounded-2xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card'>
       <div className='flex items-center justify-between gap-3'>
         <div>
-          <h2 className='font-display text-lg font-bold text-leiae-dark'>Leitura em \u00E1udio</h2>
+          <h2 className='font-display text-lg font-bold text-leiae-dark'>Leitura em áudio</h2>
           <p className='text-sm text-leiae-text/75'>Ouvir: {title}</p>
         </div>
 
@@ -119,7 +155,7 @@ export default function AudioPlayer({ src, title }) {
           type='button'
           onClick={togglePlay}
           className='inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg shadow hover:bg-leiae-dark'
-          aria-label={playing ? 'Pausar \u00E1udio' : 'Reproduzir \u00E1udio'}
+          aria-label={playing ? 'Pausar áudio' : 'Reproduzir áudio'}
         >
           {playing ? <PauseIcon /> : <PlayIcon />}
         </button>
@@ -137,11 +173,11 @@ export default function AudioPlayer({ src, title }) {
 
       {audioError ? (
         <p className='mt-3 rounded-lg bg-leiae-accent/10 px-3 py-2 text-xs font-semibold text-leiae-dark'>
-          N\u00E3o foi poss\u00EDvel tocar este \u00E1udio. Verifique se o arquivo MP3 local existe.
+          Não foi possível tocar este áudio. Verifique se o arquivo MP3 local existe.
         </p>
       ) : null}
 
-      <audio ref={audioRef} src={src} preload='metadata' className='sr-only' aria-label={`\u00C1udio da hist\u00F3ria ${title}`} />
+      <audio ref={audioRef} src={src} preload='metadata' className='sr-only' aria-label={`Áudio da história ${title}`} />
     </section>
   );
 }

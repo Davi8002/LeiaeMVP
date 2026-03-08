@@ -1,4 +1,4 @@
-import Image from 'next/image';
+﻿import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -8,7 +8,7 @@ function CoverPlaceholder() {
       <span className='rounded-full border border-leiae-dark/20 bg-white/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em]'>
         Capa em breve
       </span>
-      <p className='mt-3 text-sm font-semibold text-leiae-dark/80'>Espaco reservado para capa</p>
+      <p className='mt-3 text-sm font-semibold text-leiae-dark/80'>Espaço reservado para capa</p>
     </div>
   );
 }
@@ -55,4 +55,3 @@ export default function StoryCard({ story }) {
     </article>
   );
 }
-

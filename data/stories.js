@@ -1,7 +1,49 @@
+﻿function splitIntoSentences(text) {
+  const matches = text.match(/[^.!?]+[.!?]?/g);
+  if (!matches) return [text.trim()];
+  return matches.map((item) => item.trim()).filter(Boolean);
+}
+
+function buildTimedPhrases(paragrafos) {
+  let cursor = 0;
+  let globalIndex = 0;
+
+  return paragrafos.flatMap((paragrafo, paragrafoIndex) => {
+    const frases = splitIntoSentences(paragrafo);
+
+    return frases.map((texto, ordemNoParagrafo) => {
+      const words = texto.split(/\s+/).filter(Boolean).length;
+      const duration = Math.max(2.2, Math.min(6.5, Number((words / 2.6).toFixed(2))));
+      const inicio = Number(cursor.toFixed(2));
+      const fim = Number((cursor + duration).toFixed(2));
+
+      const phrase = {
+        indice: globalIndex,
+        paragrafoIndex,
+        ordemNoParagrafo,
+        texto,
+        inicio,
+        fim,
+      };
+
+      cursor = fim;
+      globalIndex += 1;
+      return phrase;
+    });
+  });
+}
+
+function withTimedPhrases(story) {
+  return {
+    ...story,
+    frases: buildTimedPhrases(story.paragrafos),
+  };
+}
+
 export const stories = [
   {
     id: 'luz-do-sertao',
-    titulo: 'A Luz do Sertao',
+    titulo: 'A Luz do Sertão',
     autor: 'Ana Bezerra',
     nivel: 'Iniciante',
     duracao: '5 min',
@@ -9,24 +51,24 @@ export const stories = [
     cover: '/capas/luz-do-sertao.jpg',
     audio: '/audio/luz-do-sertao.mp3',
     paragrafos: [
-      'No fim da tarde, Maria riscou o pe da chinela no chao de barro e sentiu o vento quente passar pela rua. Era dia de novena, e a vila inteira se preparava para acender lamparinas na praca.',
-      'Ela correu com a avo ate a janela da venda. Enquanto arrumavam os copos de cajuina, ouviam o zabumbaio distante do trio que vinha da feira. Cada som parecia chamar mais gente para perto.',
-      'Quando a noite chegou, Maria percebeu que nenhuma lamparina brilhava sozinha. Uma acendia a outra, de mao em mao. Foi ali que entendeu: a luz do sertao fica mais forte quando todo mundo cuida dela junto.',
+      'No fim da tarde, Maria riscou o pé da chinela no chão de barro e sentiu o vento quente passar pela rua. Era dia de novena, e a vila inteira se preparava para acender lamparinas na praça.',
+      'Ela correu com a avó até a janela da venda. Enquanto arrumavam os copos de cajuína, ouviam o zabumbaio distante do trio que vinha da feira. Cada som parecia chamar mais gente para perto.',
+      'Quando a noite chegou, Maria percebeu que nenhuma lamparina brilhava sozinha. Uma acendia a outra, de mão em mão. Foi ali que entendeu: a luz do sertão fica mais forte quando todo mundo cuida dela junto.',
     ],
   },
   {
     id: 'o-cordel-da-chuva',
     titulo: 'O Cordel da Chuva',
     autor: 'Seu Antero Lima',
-    nivel: 'Intermediario',
+    nivel: 'Intermediário',
     duracao: '6 min',
     descricao: 'Um poeta de feira recita versos que anunciam a primeira chuva do ano.',
     cover: '/capas/o-cordel-da-chuva.jpg',
     audio: '/audio/o-cordel-da-chuva.mp3',
     paragrafos: [
       'Seu Antero abriu a mala de madeira logo cedo. Dentro, havia folhetos de cordel com capas coloridas e barbante novo para pendurar tudo na barraca.',
-      'No meio da manha, ele subiu num caixote e comecou a declamar. Falou de nuvem grossa, cheiro de terra molhada e do povo sorrindo com o primeiro pingo na janela.',
-      'Antes do ultimo verso, o ceu escureceu de verdade. A chuva caiu mansa, como se acompanhasse a rima. A feira inteira bateu palma, e o cordel virou memoria de um dia esperado por meses.',
+      'No meio da manhã, ele subiu num caixote e começou a declamar. Falou de nuvem grossa, cheiro de terra molhada e do povo sorrindo com o primeiro pingo na janela.',
+      'Antes do último verso, o céu escureceu de verdade. A chuva caiu mansa, como se acompanhasse a rima. A feira inteira bateu palma, e o cordel virou memória de um dia esperado por meses.',
     ],
   },
   {
@@ -35,31 +77,31 @@ export const stories = [
     autor: 'Rita e Joana',
     nivel: 'Iniciante',
     duracao: '4 min',
-    descricao: 'Duas amigas aprendem a tocar um baiao simples com o avo da rua.',
+    descricao: 'Duas amigas aprendem a tocar um baião simples com o avô da rua.',
     cover: '/capas/sanfona-na-varanda.jpg',
     audio: '/audio/sanfona-na-varanda.mp3',
     paragrafos: [
-      'Rita e Joana sentaram na varanda de madeira com os pes balancando no ar. O avo Chico apoiou a sanfona no colo e pediu silencio para ouvir o compasso da rua.',
-      'Primeiro veio um toque curto, depois outro mais comprido. As meninas repetiram na palma da mao, rindo quando erravam. O avo dizia que musica boa e feita de paciencia e escuta.',
-      'Ao anoitecer, o baiao saiu inteiro. Os vizinhos encostaram no portao para acompanhar, e a varanda virou palco. Rita percebeu que aprender tambem pode ser festa.',
+      'Rita e Joana sentaram na varanda de madeira com os pés balançando no ar. O avô Chico apoiou a sanfona no colo e pediu silêncio para ouvir o compasso da rua.',
+      'Primeiro veio um toque curto, depois outro mais comprido. As meninas repetiram na palma da mão, rindo quando erravam. O avô dizia que música boa é feita de paciência e escuta.',
+      'Ao anoitecer, o baião saiu inteiro. Os vizinhos encostaram no portão para acompanhar, e a varanda virou palco. Rita percebeu que aprender também pode ser festa.',
     ],
   },
   {
     id: 'barco-de-jangada',
     titulo: 'Barco de Jangada',
     autor: 'Pedro do Mar',
-    nivel: 'Avancado',
+    nivel: 'Avançado',
     duracao: '7 min',
-    descricao: 'Um jovem jangadeiro aprende com a mae a ler os sinais do mar.',
+    descricao: 'Um jovem jangadeiro aprende com a mãe a ler os sinais do mar.',
     cover: '/capas/barco-de-jangada.jpg',
     audio: '/audio/barco-de-jangada.mp3',
     paragrafos: [
-      'Pedro acordou antes do sol e caminhou ate a praia com a mae, carregando rede e coragem. O mar estava liso, mas ela apontou o horizonte e falou das mudancas escondidas no vento.',
-      'Enquanto ajeitavam a jangada, ela ensinou a observar gaivotas, correnteza e o brilho da agua. Cada detalhe era uma palavra de um idioma antigo, passado de familia em familia.',
-      'Na volta, com peixe fresco no balaio, Pedro entendeu que ler o mar parecia ler um livro vivo: toda pagina mudava rapido, mas quem presta atencao encontra caminho seguro para voltar.',
+      'Pedro acordou antes do sol e caminhou até a praia com a mãe, carregando rede e coragem. O mar estava liso, mas ela apontou o horizonte e falou das mudanças escondidas no vento.',
+      'Enquanto ajeitavam a jangada, ela ensinou a observar gaivotas, correnteza e o brilho da água. Cada detalhe era uma palavra de um idioma antigo, passado de família em família.',
+      'Na volta, com peixe fresco no balaio, Pedro entendeu que ler o mar parecia ler um livro vivo: toda página mudava rápido, mas quem presta atenção encontra caminho seguro para voltar.',
     ],
   },
-];
+].map(withTimedPhrases);
 
 export function getStoryById(id) {
   return stories.find((story) => story.id === id);

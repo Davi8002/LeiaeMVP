@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import Link from 'next/link';
 import AppShell from '../components/AppShell';
 import Logo from '../components/Logo';
@@ -8,15 +8,15 @@ export default function HomePage() {
     <>
       <Head>
         <meta charSet='UTF-8' />
-        <title>Leia\u00CA | Ler com apoio, no seu ritmo.</title>
+        <title>LeiaÊ | Ler com apoio, no seu ritmo.</title>
         <meta
           name='description'
-          content='Leia\u00CA e uma plataforma de leitura digital acessivel com historias, audio e ajustes de leitura em tempo real.'
+          content='LeiaÊ é uma plataforma de leitura digital acessível com histórias, áudio e ajustes de leitura em tempo real.'
         />
       </Head>
 
       <AppShell
-        title='Leia\u00CA'
+        title='LeiaÊ'
         subtitle='Ler com apoio, no seu ritmo.'
         activeTab='home'
         darkHeader
@@ -29,7 +29,7 @@ export default function HomePage() {
               Ler com apoio, no seu ritmo.
             </h1>
             <p className='mt-3 max-w-xl text-base text-leiae-text/90 sm:text-lg'>
-              O Leia\u00CA ajuda pessoas a desenvolverem ou retomarem o habito da leitura com uma experiencia confortavel, acolhedora e acessivel.
+              O LeiaÊ ajuda pessoas a desenvolverem ou retomarem o hábito da leitura com uma experiência confortável, acolhedora e acessível.
             </p>
 
             <Link
@@ -46,7 +46,7 @@ export default function HomePage() {
               </div>
               <div className='rounded-2xl border border-leiae-dark/10 bg-white/70 p-4'>
                 <p className='text-sm font-semibold text-leiae-dark/70'>Leitura guiada</p>
-                <p className='mt-1 text-lg font-bold text-leiae-dark'>Audio local em MP3</p>
+                <p className='mt-1 text-lg font-bold text-leiae-dark'>Áudio local em MP3</p>
               </div>
             </div>
           </article>
@@ -62,4 +62,3 @@ export default function HomePage() {
     </>
   );
 }
-

@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import AppShell from '../components/AppShell';
 import StoryCard from '../components/StoryCard';
 import { stories } from '../data/stories';
@@ -17,13 +17,13 @@ export default function BibliotecaPage() {
     <>
       <Head>
         <meta charSet='UTF-8' />
-        <title>Biblioteca | Leia\u00CA</title>
-        <meta name='description' content='Biblioteca de historias do Leia\u00CA com leitura acessivel e audio local.' />
+        <title>Biblioteca | LeiaÊ</title>
+        <meta name='description' content='Biblioteca de histórias do LeiaÊ com leitura acessível e áudio local.' />
       </Head>
 
       <AppShell
-        title='Leia\u00CA'
-        subtitle='Biblioteca de historias'
+        title='LeiaÊ'
+        subtitle='Biblioteca de histórias'
         activeTab='biblioteca'
         darkHeader
         maxWidthClass='max-w-[430px] sm:max-w-[700px] md:max-w-5xl lg:max-w-6xl'
@@ -32,14 +32,14 @@ export default function BibliotecaPage() {
         <section className='space-y-5'>
           <div className='rounded-2xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card sm:p-5'>
             <p className='text-sm font-semibold uppercase tracking-[0.12em] text-leiae-dark/65'>Biblioteca</p>
-            <h1 className='mt-1 font-display text-3xl font-bold text-leiae-dark'>Escolha sua proxima leitura</h1>
+            <h1 className='mt-1 font-display text-3xl font-bold text-leiae-dark'>Escolha sua próxima leitura</h1>
 
             <label className='mt-4 flex items-center gap-2 rounded-xl border border-leiae-dark/10 bg-white/70 px-3 py-2 text-leiae-dark/70'>
               <SearchIcon />
               <input
                 type='text'
                 readOnly
-                placeholder='Buscar historia, autor ou nivel'
+                placeholder='Buscar história, autor ou nível'
                 className='w-full bg-transparent text-sm outline-none'
                 aria-label='Campo de busca visual'
               />
@@ -56,4 +56,3 @@ export default function BibliotecaPage() {
     </>
   );
 }
-

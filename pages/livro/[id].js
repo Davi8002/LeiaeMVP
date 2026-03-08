@@ -1,11 +1,32 @@
-import Head from 'next/head';
-import { useMemo, useState } from 'react';
+﻿import Head from 'next/head';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import AppShell from '../../components/AppShell';
 import AccessibilityControls from '../../components/AccessibilityControls';
 import AudioPlayer from '../../components/AudioPlayer';
+import GuidedReadingControls from '../../components/GuidedReadingControls';
+import GuidedReadingText from '../../components/GuidedReadingText';
 import { getStoryById } from '../../data/stories';
+
+function getPhraseIndexByTime(frases, time) {
+  if (!frases?.length) return 0;
+
+  const foundIndex = frases.findIndex((frase, index) => {
+    const nextStart = frases[index + 1]?.inicio;
+    if (typeof nextStart === 'number') {
+      return time >= frase.inicio && time < nextStart;
+    }
+
+    return time >= frase.inicio && time <= frase.fim + 0.45;
+  });
+
+  if (foundIndex === -1) {
+    return frases.length - 1;
+  }
+
+  return foundIndex;
+}
 
 export default function LeituraPage() {
   const router = useRouter();
@@ -17,7 +38,94 @@ export default function LeituraPage() {
   const [highContrast, setHighContrast] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
 
-  const pageTitle = story ? `${story.titulo} | Leia\u00CA` : 'Leitura | Leia\u00CA';
+  const [guidedPlaying, setGuidedPlaying] = useState(false);
+  const [guidedSpeed, setGuidedSpeed] = useState(1);
+  const [guidedPhraseIndex, setGuidedPhraseIndex] = useState(0);
+
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+
+  const totalPhrases = story?.frases?.length ?? 1;
+  const pageTitle = story ? `${story.titulo} | LeiaÊ` : 'Leitura | LeiaÊ';
+
+  const audioSyncActive = audioPlaying && audioDuration > 0 && (story?.frases?.length ?? 0) > 0;
+
+  const canIncreaseSpeed = guidedSpeed < 2.5;
+  const canDecreaseSpeed = guidedSpeed > 0.5;
+
+  useEffect(() => {
+    if (!story) return;
+
+    setGuidedPlaying(false);
+    setGuidedSpeed(1);
+    setGuidedPhraseIndex(0);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+    setAudioPlaying(false);
+  }, [story]);
+
+  const syncFromAudio = useCallback(
+    (time) => {
+      if (!story?.frases?.length) return;
+      const nextIndex = getPhraseIndexByTime(story.frases, time);
+      setGuidedPhraseIndex(nextIndex);
+    },
+    [story],
+  );
+
+  useEffect(() => {
+    if (!audioSyncActive) return;
+
+    syncFromAudio(audioCurrentTime);
+  }, [audioCurrentTime, audioSyncActive, syncFromAudio]);
+
+  useEffect(() => {
+    if (!guidedPlaying || audioSyncActive || totalPhrases <= 1) return undefined;
+
+    const intervalMs = Math.max(700, Math.round(2800 / guidedSpeed));
+
+    const timer = setInterval(() => {
+      setGuidedPhraseIndex((previous) => {
+        if (previous >= totalPhrases - 1) {
+          return previous;
+        }
+
+        return previous + 1;
+      });
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [audioSyncActive, guidedPlaying, guidedSpeed, totalPhrases]);
+
+  useEffect(() => {
+    if (!guidedPlaying || audioSyncActive) return;
+
+    if (guidedPhraseIndex >= totalPhrases - 1) {
+      setGuidedPlaying(false);
+    }
+  }, [audioSyncActive, guidedPhraseIndex, guidedPlaying, totalPhrases]);
+
+  const toggleGuided = () => {
+    if (guidedPlaying) {
+      setGuidedPlaying(false);
+      return;
+    }
+
+    if (guidedPhraseIndex >= totalPhrases - 1) {
+      setGuidedPhraseIndex(0);
+    }
+
+    setGuidedPlaying(true);
+  };
+
+  const increaseSpeed = () => {
+    setGuidedSpeed((previous) => Number(Math.min(2.5, previous + 0.25).toFixed(2)));
+  };
+
+  const decreaseSpeed = () => {
+    setGuidedSpeed((previous) => Number(Math.max(0.5, previous - 0.25).toFixed(2)));
+  };
 
   if (!router.isReady) {
     return null;
@@ -28,13 +136,13 @@ export default function LeituraPage() {
       <>
         <Head>
           <meta charSet='UTF-8' />
-          <title>Leitura | Leia\u00CA</title>
-          <meta name='description' content='Tela de leitura acessivel do Leia\u00CA.' />
+          <title>Leitura | LeiaÊ</title>
+          <meta name='description' content='Tela de leitura acessível do LeiaÊ.' />
         </Head>
 
         <main className='flex min-h-screen items-center justify-center bg-leiae-bg px-6 text-center text-leiae-dark'>
           <div>
-            <p className='text-xl font-semibold'>Historia nao encontrada.</p>
+            <p className='text-xl font-semibold'>História não encontrada.</p>
             <Link href='/biblioteca' className='mt-5 inline-flex rounded-xl bg-leiae-accent px-5 py-3 font-bold text-leiae-bg'>
               Voltar para biblioteca
             </Link>
@@ -58,11 +166,11 @@ export default function LeituraPage() {
       <Head>
         <meta charSet='UTF-8' />
         <title>{pageTitle}</title>
-        <meta name='description' content={`Leitura da historia ${story.titulo} no Leia\u00CA.`} />
+        <meta name='description' content={`Leitura da história ${story.titulo} no LeiaÊ.`} />
       </Head>
 
       <AppShell
-        title='Leia\u00CA'
+        title='LeiaÊ'
         subtitle='Modo leitura'
         activeTab='leitura'
         darkHeader
@@ -93,16 +201,37 @@ export default function LeituraPage() {
                 setFocusMode={setFocusMode}
               />
 
-              <AudioPlayer src={story.audio} title={story.titulo} />
+              <GuidedReadingControls
+                guidedPlaying={guidedPlaying}
+                onToggleGuided={toggleGuided}
+                guidedSpeed={guidedSpeed}
+                onIncreaseSpeed={increaseSpeed}
+                onDecreaseSpeed={decreaseSpeed}
+                canIncreaseSpeed={canIncreaseSpeed}
+                canDecreaseSpeed={canDecreaseSpeed}
+                audioSyncActive={audioSyncActive}
+                activePhraseIndex={guidedPhraseIndex}
+                totalPhrases={totalPhrases}
+              />
+
+              <AudioPlayer
+                src={story.audio}
+                title={story.titulo}
+                onTimeUpdate={setAudioCurrentTime}
+                onPlayStateChange={setAudioPlaying}
+                onDurationChange={setAudioDuration}
+              />
             </div>
 
             <article className={`rounded-2xl border p-5 transition sm:p-6 ${readingCardTone} ${focusReadingClass}`}>
               <h2 className={`font-display text-2xl ${highContrast ? 'text-leiae-bg' : 'text-leiae-dark'}`}>Leitura</h2>
-              <div className='mt-4 space-y-5 leading-relaxed' style={{ fontSize: `${fontScale}rem` }}>
-                {story.paragrafos.map((paragrafo, index) => (
-                  <p key={`${story.id}-${index}`}>{paragrafo}</p>
-                ))}
-              </div>
+
+              <GuidedReadingText
+                story={story}
+                activePhraseIndex={guidedPhraseIndex}
+                fontScale={fontScale}
+                highContrast={highContrast}
+              />
             </article>
           </div>
         </section>
@@ -110,4 +239,3 @@ export default function LeituraPage() {
     </>
   );
 }
-

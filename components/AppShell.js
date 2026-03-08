@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import Logo from './Logo';
 import BottomNav from './BottomNav';
 
@@ -12,8 +12,8 @@ function BackArrow() {
 
 export default function AppShell({
   children,
-  title = 'Leia\u00CA',
-  subtitle = 'Leitura acessivel',
+  title = 'LeiaÊ',
+  subtitle = 'Leitura acessível',
   activeTab = 'home',
   darkHeader = true,
   showTopNav = true,
@@ -74,7 +74,7 @@ export default function AppShell({
                       : 'bg-leiae-dark/10 text-leiae-dark/80'
                 }`}
               >
-                In\u00EDcio
+                Início
               </Link>
               <Link
                 href='/biblioteca'
