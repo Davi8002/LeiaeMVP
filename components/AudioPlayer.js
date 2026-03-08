@@ -42,7 +42,10 @@ export default function AudioPlayer({ src, title }) {
     const onEnded = () => setPlaying(false);
     const onTimeUpdate = () => setCurrentTime(audio.currentTime || 0);
     const onLoadedMetadata = () => setDuration(audio.duration || 0);
-    const onError = () => setAudioError(true);
+    const onError = () => {
+      setAudioError(true);
+      setPlaying(false);
+    };
 
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
@@ -62,12 +65,15 @@ export default function AudioPlayer({ src, title }) {
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    };
-  }, []);
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+    setPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setAudioError(false);
+  }, [src]);
 
   const togglePlay = async () => {
     const audio = audioRef.current;
@@ -76,11 +82,13 @@ export default function AudioPlayer({ src, title }) {
     if (audio.paused) {
       try {
         await audio.play();
+        setPlaying(true);
       } catch (_error) {
         setPlaying(false);
       }
     } else {
       audio.pause();
+      setPlaying(false);
     }
   };
 
@@ -93,7 +101,7 @@ export default function AudioPlayer({ src, title }) {
     <section className='rounded-2xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card'>
       <div className='flex items-center justify-between gap-3'>
         <div>
-          <h2 className='font-display text-lg font-bold text-leiae-dark'>Leitura em audio</h2>
+          <h2 className='font-display text-lg font-bold text-leiae-dark'>Leitura em \u00E1udio</h2>
           <p className='text-sm text-leiae-text/75'>Ouvir: {title}</p>
         </div>
 
@@ -111,7 +119,7 @@ export default function AudioPlayer({ src, title }) {
           type='button'
           onClick={togglePlay}
           className='inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg shadow hover:bg-leiae-dark'
-          aria-label={playing ? 'Pausar audio' : 'Reproduzir audio'}
+          aria-label={playing ? 'Pausar \u00E1udio' : 'Reproduzir \u00E1udio'}
         >
           {playing ? <PauseIcon /> : <PlayIcon />}
         </button>
@@ -129,11 +137,11 @@ export default function AudioPlayer({ src, title }) {
 
       {audioError ? (
         <p className='mt-3 rounded-lg bg-leiae-accent/10 px-3 py-2 text-xs font-semibold text-leiae-dark'>
-          Nao foi possivel tocar este audio. Verifique se o arquivo MP3 local existe.
+          N\u00E3o foi poss\u00EDvel tocar este \u00E1udio. Verifique se o arquivo MP3 local existe.
         </p>
       ) : null}
 
-      <audio ref={audioRef} src={src} preload='metadata' className='sr-only' aria-label={`Audio da historia ${title}`} />
+      <audio ref={audioRef} src={src} preload='metadata' className='sr-only' aria-label={`\u00C1udio da hist\u00F3ria ${title}`} />
     </section>
   );
 }

@@ -1,18 +1,14 @@
 import Image from 'next/image';
+import logoLeiae from '../pngs/Logo_Leiae.png';
 
 export default function Logo({ onDark = false, className = '', priority = false }) {
-  const src = onDark ? '/logos/leiae-dark.svg' : '/logos/leiae-light.svg';
-
   return (
     <Image
-      src={src}
+      src={logoLeiae}
       alt='Logo Leia\u00CA'
-      width={220}
-      height={92}
       priority={priority}
       sizes='220px'
-      className={className}
+      className={`${className} ${onDark ? 'brightness-0 invert' : ''}`.trim()}
     />
   );
 }
-

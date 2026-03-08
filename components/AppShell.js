@@ -12,7 +12,7 @@ function BackArrow() {
 
 export default function AppShell({
   children,
-  title = 'Leia\u00ca',
+  title = 'Leia\u00CA',
   subtitle = 'Leitura acessivel',
   activeTab = 'home',
   darkHeader = true,
@@ -20,15 +20,15 @@ export default function AppShell({
   showBottomNav = true,
   backHref,
   readingHref = '/biblioteca',
-  maxWidthClass = 'max-w-[430px]',
+  maxWidthClass = 'max-w-[430px] sm:max-w-[560px] md:max-w-4xl lg:max-w-6xl',
 }) {
   return (
-    <main className='min-h-screen bg-grainWarm px-0 py-0 sm:px-4 sm:py-6'>
+    <main className='min-h-screen bg-grainWarm px-0 py-0 sm:px-4 sm:py-4 lg:px-8 lg:py-6'>
       <div
-        className={`relative mx-auto flex min-h-screen w-full ${maxWidthClass} flex-col overflow-hidden border border-leiae-dark/15 bg-leiae-bg shadow-app sm:min-h-[calc(100vh-3rem)] sm:rounded-app`}
+        className={`relative mx-auto flex min-h-screen w-full ${maxWidthClass} flex-col overflow-hidden border border-leiae-dark/15 bg-leiae-bg shadow-app sm:min-h-[calc(100vh-2rem)] sm:rounded-app`}
       >
         <header
-          className={`px-4 pb-4 pt-4 ${
+          className={`px-4 pb-4 pt-4 sm:px-6 ${
             darkHeader
               ? 'bg-gradient-to-r from-leiae-accent to-[#9f3b21] text-leiae-bg'
               : 'border-b border-leiae-dark/10 bg-leiae-paper text-leiae-dark'
@@ -48,10 +48,12 @@ export default function AppShell({
             )}
 
             <div className='flex items-center gap-3'>
-              <Logo onDark={darkHeader} className='h-auto w-[110px]' />
+              <div className={`rounded-xl px-2 py-1 ${darkHeader ? 'bg-white/10' : 'bg-leiae-bg/70'}`}>
+                <Logo onDark={darkHeader} className='h-auto w-[92px] sm:w-[108px]' priority />
+              </div>
               <div>
-                <p className='font-display text-lg font-bold leading-tight'>{title}</p>
-                <p className={`text-xs ${darkHeader ? 'text-leiae-bg/85' : 'text-leiae-dark/65'}`}>{subtitle}</p>
+                <p className='font-display text-lg font-bold leading-tight sm:text-xl'>{title}</p>
+                <p className={`text-xs sm:text-sm ${darkHeader ? 'text-leiae-bg/90' : 'text-leiae-dark/70'}`}>{subtitle}</p>
               </div>
             </div>
 
@@ -59,7 +61,7 @@ export default function AppShell({
           </div>
 
           {showTopNav && !backHref ? (
-            <nav className='mt-4 flex gap-2'>
+            <nav className='mt-4 flex flex-wrap gap-2'>
               <Link
                 href='/'
                 className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
@@ -72,7 +74,7 @@ export default function AppShell({
                       : 'bg-leiae-dark/10 text-leiae-dark/80'
                 }`}
               >
-                Inicio
+                In\u00EDcio
               </Link>
               <Link
                 href='/biblioteca'
@@ -92,11 +94,14 @@ export default function AppShell({
           ) : null}
         </header>
 
-        <section className='relative flex-1 overflow-y-auto px-4 pb-28 pt-5'>{children}</section>
+        <section className='relative flex-1 overflow-y-auto px-4 pb-28 pt-5 sm:px-6 md:pb-10 lg:px-8 xl:px-10'>{children}</section>
 
-        {showBottomNav ? <BottomNav active={activeTab} readingHref={readingHref} /> : null}
+        {showBottomNav ? (
+          <div className='md:hidden'>
+            <BottomNav active={activeTab} readingHref={readingHref} />
+          </div>
+        ) : null}
       </div>
     </main>
   );
 }
-
