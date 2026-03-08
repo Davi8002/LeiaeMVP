@@ -57,6 +57,74 @@ function ArrowIcon({ direction = 'left' }) {
   );
 }
 
+function QuickBackIcon() {
+  return (
+    <svg viewBox='0 0 24 24' className='h-4 w-4' fill='none' stroke='currentColor' strokeWidth='2'>
+      <path d='M19 6l-6 6 6 6' strokeLinecap='round' strokeLinejoin='round' />
+      <path d='M13 6l-6 6 6 6' strokeLinecap='round' strokeLinejoin='round' />
+      <path d='M5 7v10' strokeLinecap='round' />
+    </svg>
+  );
+}
+
+function QuickForwardIcon() {
+  return (
+    <svg viewBox='0 0 24 24' className='h-4 w-4' fill='none' stroke='currentColor' strokeWidth='2'>
+      <path d='M5 6l6 6-6 6' strokeLinecap='round' strokeLinejoin='round' />
+      <path d='M11 6l6 6-6 6' strokeLinecap='round' strokeLinejoin='round' />
+      <path d='M19 7v10' strokeLinecap='round' />
+    </svg>
+  );
+}
+
+function QuickPlayIcon() {
+  return (
+    <svg viewBox='0 0 24 24' className='h-4 w-4' fill='currentColor'>
+      <path d='M8 6.8c0-1 1.1-1.6 2-1l7.8 4.8c.8.5.8 1.7 0 2.2L10 17.6c-.9.6-2 0-2-1V6.8z' />
+    </svg>
+  );
+}
+
+function QuickPauseIcon() {
+  return (
+    <svg viewBox='0 0 24 24' className='h-4 w-4' fill='currentColor'>
+      <rect x='7' y='6.5' width='3.8' height='11' rx='1.2' />
+      <rect x='13.2' y='6.5' width='3.8' height='11' rx='1.2' />
+    </svg>
+  );
+}
+
+function buildPageRanges(words) {
+  if (!Array.isArray(words) || words.length === 0) {
+    return [{ start: 0, end: 0 }];
+  }
+
+  const ranges = [];
+  const wordsPerPage = 110;
+  const minWordsPerPage = 78;
+  let start = 0;
+
+  while (start < words.length) {
+    const isLastChunk = start + wordsPerPage >= words.length;
+    let end = isLastChunk ? words.length - 1 : start + wordsPerPage - 1;
+
+    if (!isLastChunk) {
+      const searchStart = Math.max(start + minWordsPerPage - 1, start);
+      for (let i = end; i >= searchStart; i -= 1) {
+        if (/[.!?…]$/.test(words[i].texto)) {
+          end = i;
+          break;
+        }
+      }
+    }
+
+    ranges.push({ start, end });
+    start = end + 1;
+  }
+
+  return ranges;
+}
+
 export default function LeituraPage() {
   const router = useRouter();
   const { id } = router.query;
@@ -106,29 +174,7 @@ export default function LeituraPage() {
     ? 'Sincronizado com voz robotizada'
     : 'Modo visual independente';
 
-  const pageRanges = useMemo(() => {
-    if (!story?.palavras?.length) return [{ start: 0, end: 0 }];
-
-    const grouped = story.paragrafos.map(() => ({ start: null, end: null }));
-
-    story.palavras.forEach((word) => {
-      const range = grouped[word.paragrafoIndex];
-      if (!range) return;
-
-      if (range.start === null) {
-        range.start = word.indice;
-      }
-
-      range.end = word.indice;
-    });
-
-    return grouped
-      .map((range) => ({
-        start: typeof range.start === 'number' ? range.start : 0,
-        end: typeof range.end === 'number' ? range.end : 0,
-      }))
-      .filter((range, index, list) => list.length === 1 || range.end >= range.start);
-  }, [story]);
+  const pageRanges = useMemo(() => buildPageRanges(story?.palavras), [story]);
 
   const currentPageIndex = useMemo(() => {
     if (!pageRanges.length) return 0;
@@ -137,6 +183,8 @@ export default function LeituraPage() {
     if (index === -1) return pageRanges.length - 1;
     return index;
   }, [guidedWordIndex, pageRanges]);
+
+  const currentPageRange = pageRanges[currentPageIndex] || pageRanges[0];
 
   const dispatchSpeechAction = useCallback((type, payload = {}) => {
     speechActionIdRef.current += 1;
@@ -411,25 +459,31 @@ export default function LeituraPage() {
                       type='button'
                       onClick={() => handleQuickJump(-3)}
                       disabled={quickDisabled}
-                      className='rounded-full border border-leiae-dark/20 bg-white px-2 py-1 transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+                      className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+                      aria-label='Voltar 3 palavras'
+                      title='Voltar 3 palavras'
                     >
-                      Voltar 3
+                      <QuickBackIcon />
                     </button>
                     <button
                       type='button'
                       onClick={handleQuickToggle}
                       disabled={quickDisabled}
-                      className='rounded-full bg-leiae-accent px-2 py-1 text-leiae-bg transition hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-45'
+                      className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg transition hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-45'
+                      aria-label={speechStatus.isPlaying ? 'Pausar leitura' : 'Retomar leitura'}
+                      title={speechStatus.isPlaying ? 'Pausar leitura' : 'Retomar leitura'}
                     >
-                      {speechStatus.isPlaying ? 'Pausar' : 'Retomar'}
+                      {speechStatus.isPlaying ? <QuickPauseIcon /> : <QuickPlayIcon />}
                     </button>
                     <button
                       type='button'
                       onClick={() => handleQuickJump(3)}
                       disabled={quickDisabled}
-                      className='rounded-full border border-leiae-dark/20 bg-white px-2 py-1 transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+                      className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+                      aria-label='Avançar 3 palavras'
+                      title='Avançar 3 palavras'
                     >
-                      Avançar 3
+                      <QuickForwardIcon />
                     </button>
                   </div>
                 </div>
@@ -447,6 +501,7 @@ export default function LeituraPage() {
                 activeWordIndex={guidedWordIndex}
                 fontScale={fontScale}
                 highContrast={highContrast}
+                visibleRange={currentPageRange}
               />
 
               <div className='mt-8 border-t border-leiae-dark/10 pt-4'>
@@ -564,4 +619,5 @@ export default function LeituraPage() {
     </>
   );
 }
+
 

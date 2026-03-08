@@ -1,27 +1,41 @@
 ﻿import { useMemo } from 'react';
 
-export default function GuidedReadingText({ story, activeWordIndex, fontScale, highContrast }) {
+export default function GuidedReadingText({ story, activeWordIndex, fontScale, highContrast, visibleRange }) {
   const wordsByParagraph = useMemo(() => {
+    const start = typeof visibleRange?.start === 'number' ? visibleRange.start : null;
+    const end = typeof visibleRange?.end === 'number' ? visibleRange.end : null;
+    const hasRange = start !== null && end !== null && end >= start;
+
     if (!story?.palavras?.length) {
-      return story.paragrafos.map((paragrafo, paragraphIndex) =>
+      const fallback = story.paragrafos.map((paragrafo, paragraphIndex) =>
         paragrafo.split(/\s+/).filter(Boolean).map((texto, indice) => ({
           texto,
           indice: paragraphIndex * 1000 + indice,
           paragrafoIndex: paragraphIndex,
         })),
       );
+
+      if (!hasRange) return fallback;
+
+      return fallback
+        .map((palavras) => palavras.filter((palavra) => palavra.indice >= start && palavra.indice <= end))
+        .filter((palavras) => palavras.length > 0);
     }
 
     const grouped = story.paragrafos.map(() => []);
 
     story.palavras.forEach((palavra) => {
+      if (hasRange && (palavra.indice < start || palavra.indice > end)) {
+        return;
+      }
+
       if (grouped[palavra.paragrafoIndex]) {
         grouped[palavra.paragrafoIndex].push(palavra);
       }
     });
 
-    return grouped;
-  }, [story]);
+    return grouped.filter((palavras) => palavras.length > 0);
+  }, [story, visibleRange]);
 
   const activeWordClass = highContrast ? 'bg-leiae-accent text-leiae-bg' : 'bg-leiae-accent text-leiae-bg';
 
