@@ -7,22 +7,23 @@ import AccessibilityControls from '../../components/AccessibilityControls';
 import AudioPlayer from '../../components/AudioPlayer';
 import GuidedReadingControls from '../../components/GuidedReadingControls';
 import GuidedReadingText from '../../components/GuidedReadingText';
+import SpeechSynthesisPlayer from '../../components/SpeechSynthesisPlayer';
 import { getStoryById } from '../../data/stories';
 
-function getPhraseIndexByTime(frases, time) {
-  if (!frases?.length) return 0;
+function getWordIndexByTime(words, time) {
+  if (!words?.length) return 0;
 
-  const foundIndex = frases.findIndex((frase, index) => {
-    const nextStart = frases[index + 1]?.inicio;
+  const foundIndex = words.findIndex((word, index) => {
+    const nextStart = words[index + 1]?.inicio;
     if (typeof nextStart === 'number') {
-      return time >= frase.inicio && time < nextStart;
+      return time >= word.inicio && time < nextStart;
     }
 
-    return time >= frase.inicio && time <= frase.fim + 0.45;
+    return time >= word.inicio && time <= word.fim + 0.35;
   });
 
   if (foundIndex === -1) {
-    return frases.length - 1;
+    return words.length - 1;
   }
 
   return foundIndex;
@@ -40,54 +41,64 @@ export default function LeituraPage() {
 
   const [guidedPlaying, setGuidedPlaying] = useState(false);
   const [guidedSpeed, setGuidedSpeed] = useState(1);
-  const [guidedPhraseIndex, setGuidedPhraseIndex] = useState(0);
+  const [guidedWordIndex, setGuidedWordIndex] = useState(0);
 
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioPlaying, setAudioPlaying] = useState(false);
 
-  const totalPhrases = story?.frases?.length ?? 1;
+  const [speechPlaying, setSpeechPlaying] = useState(false);
+
+  const totalWords = story?.palavras?.length ?? 1;
   const pageTitle = story ? `${story.titulo} | LeiaÊ` : 'Leitura | LeiaÊ';
 
-  const audioSyncActive = audioPlaying && audioDuration > 0 && (story?.frases?.length ?? 0) > 0;
+  const audioSyncActive = audioPlaying && audioDuration > 0 && (story?.palavras?.length ?? 0) > 0;
+  const speechSyncActive = speechPlaying && (story?.palavras?.length ?? 0) > 0;
 
-  const canIncreaseSpeed = guidedSpeed < 2.5;
+  const canIncreaseSpeed = guidedSpeed < 3;
   const canDecreaseSpeed = guidedSpeed > 0.5;
+
+  const syncLabel = speechSyncActive
+    ? 'Sincronizado com voz automática'
+    : audioSyncActive
+      ? 'Sincronizado com áudio'
+      : 'Modo visual independente';
 
   useEffect(() => {
     if (!story) return;
 
     setGuidedPlaying(false);
     setGuidedSpeed(1);
-    setGuidedPhraseIndex(0);
+    setGuidedWordIndex(0);
     setAudioCurrentTime(0);
     setAudioDuration(0);
     setAudioPlaying(false);
+    setSpeechPlaying(false);
   }, [story]);
 
   const syncFromAudio = useCallback(
     (time) => {
-      if (!story?.frases?.length) return;
-      const nextIndex = getPhraseIndexByTime(story.frases, time);
-      setGuidedPhraseIndex(nextIndex);
+      if (!story?.palavras?.length) return;
+      const nextIndex = getWordIndexByTime(story.palavras, time);
+      setGuidedWordIndex(nextIndex);
     },
     [story],
   );
 
   useEffect(() => {
-    if (!audioSyncActive) return;
+    if (!audioSyncActive || speechSyncActive) return;
 
     syncFromAudio(audioCurrentTime);
-  }, [audioCurrentTime, audioSyncActive, syncFromAudio]);
+  }, [audioCurrentTime, audioSyncActive, speechSyncActive, syncFromAudio]);
 
   useEffect(() => {
-    if (!guidedPlaying || audioSyncActive || totalPhrases <= 1) return undefined;
+    if (!guidedPlaying || audioSyncActive || speechSyncActive || totalWords <= 1) return undefined;
 
-    const intervalMs = Math.max(700, Math.round(2800 / guidedSpeed));
+    const intervalMs = Math.max(110, Math.round(450 / guidedSpeed));
 
     const timer = setInterval(() => {
-      setGuidedPhraseIndex((previous) => {
-        if (previous >= totalPhrases - 1) {
+      setGuidedWordIndex((previous) => {
+        if (previous >= totalWords - 1) {
           return previous;
         }
 
@@ -96,15 +107,15 @@ export default function LeituraPage() {
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [audioSyncActive, guidedPlaying, guidedSpeed, totalPhrases]);
+  }, [audioSyncActive, guidedPlaying, guidedSpeed, speechSyncActive, totalWords]);
 
   useEffect(() => {
-    if (!guidedPlaying || audioSyncActive) return;
+    if (!guidedPlaying || audioSyncActive || speechSyncActive) return;
 
-    if (guidedPhraseIndex >= totalPhrases - 1) {
+    if (guidedWordIndex >= totalWords - 1) {
       setGuidedPlaying(false);
     }
-  }, [audioSyncActive, guidedPhraseIndex, guidedPlaying, totalPhrases]);
+  }, [audioSyncActive, guidedPlaying, guidedWordIndex, speechSyncActive, totalWords]);
 
   const toggleGuided = () => {
     if (guidedPlaying) {
@@ -112,15 +123,15 @@ export default function LeituraPage() {
       return;
     }
 
-    if (guidedPhraseIndex >= totalPhrases - 1) {
-      setGuidedPhraseIndex(0);
+    if (guidedWordIndex >= totalWords - 1) {
+      setGuidedWordIndex(0);
     }
 
     setGuidedPlaying(true);
   };
 
   const increaseSpeed = () => {
-    setGuidedSpeed((previous) => Number(Math.min(2.5, previous + 0.25).toFixed(2)));
+    setGuidedSpeed((previous) => Number(Math.min(3, previous + 0.25).toFixed(2)));
   };
 
   const decreaseSpeed = () => {
@@ -209,9 +220,9 @@ export default function LeituraPage() {
                 onDecreaseSpeed={decreaseSpeed}
                 canIncreaseSpeed={canIncreaseSpeed}
                 canDecreaseSpeed={canDecreaseSpeed}
-                audioSyncActive={audioSyncActive}
-                activePhraseIndex={guidedPhraseIndex}
-                totalPhrases={totalPhrases}
+                syncLabel={syncLabel}
+                activeWordIndex={guidedWordIndex}
+                totalWords={totalWords}
               />
 
               <AudioPlayer
@@ -221,6 +232,13 @@ export default function LeituraPage() {
                 onPlayStateChange={setAudioPlaying}
                 onDurationChange={setAudioDuration}
               />
+
+              <SpeechSynthesisPlayer
+                text={story.textoNarracao}
+                words={story.palavras}
+                onWordBoundary={setGuidedWordIndex}
+                onPlayStateChange={setSpeechPlaying}
+              />
             </div>
 
             <article className={`rounded-2xl border p-5 transition sm:p-6 ${readingCardTone} ${focusReadingClass}`}>
@@ -228,7 +246,7 @@ export default function LeituraPage() {
 
               <GuidedReadingText
                 story={story}
-                activePhraseIndex={guidedPhraseIndex}
+                activeWordIndex={guidedWordIndex}
                 fontScale={fontScale}
                 highContrast={highContrast}
               />

@@ -1,4 +1,5 @@
 ﻿import Head from 'next/head';
+import { useMemo, useState } from 'react';
 import AppShell from '../components/AppShell';
 import StoryCard from '../components/StoryCard';
 import { stories } from '../data/stories';
@@ -12,7 +13,24 @@ function SearchIcon() {
   );
 }
 
+function normalizeText(value) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 export default function BibliotecaPage() {
+  const [search, setSearch] = useState('');
+
+  const filteredStories = useMemo(() => {
+    const normalizedSearch = normalizeText(search.trim());
+    if (!normalizedSearch) return stories;
+
+    return stories.filter((story) => {
+      const title = normalizeText(story.titulo);
+      const description = normalizeText(story.descricao);
+      return title.includes(normalizedSearch) || description.includes(normalizedSearch);
+    });
+  }, [search]);
+
   return (
     <>
       <Head>
@@ -38,19 +56,27 @@ export default function BibliotecaPage() {
               <SearchIcon />
               <input
                 type='text'
-                readOnly
-                placeholder='Buscar história, autor ou nível'
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder='Buscar título ou descrição'
                 className='w-full bg-transparent text-sm outline-none'
-                aria-label='Campo de busca visual'
+                aria-label='Buscar histórias'
               />
             </label>
           </div>
 
-          <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:gap-5'>
-            {stories.map((story) => (
-              <StoryCard key={story.id} story={story} />
-            ))}
-          </div>
+          {filteredStories.length > 0 ? (
+            <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:gap-5'>
+              {filteredStories.map((story) => (
+                <StoryCard key={story.id} story={story} />
+              ))}
+            </div>
+          ) : (
+            <div className='rounded-2xl border border-leiae-dark/10 bg-leiae-paper p-6 text-center shadow-card'>
+              <p className='text-lg font-semibold text-leiae-dark'>Nenhum livro encontrado.</p>
+              <p className='mt-2 text-sm text-leiae-text/80'>Tente buscar por outras palavras do título ou da descrição.</p>
+            </div>
+          )}
         </section>
       </AppShell>
     </>

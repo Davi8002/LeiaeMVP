@@ -4,6 +4,12 @@
   return matches.map((item) => item.trim()).filter(Boolean);
 }
 
+function splitIntoWords(text) {
+  const matches = text.match(/\S+/g);
+  if (!matches) return [];
+  return matches;
+}
+
 function buildTimedPhrases(paragrafos) {
   let cursor = 0;
   let globalIndex = 0;
@@ -12,7 +18,7 @@ function buildTimedPhrases(paragrafos) {
     const frases = splitIntoSentences(paragrafo);
 
     return frases.map((texto, ordemNoParagrafo) => {
-      const words = texto.split(/\s+/).filter(Boolean).length;
+      const words = splitIntoWords(texto).length;
       const duration = Math.max(2.2, Math.min(6.5, Number((words / 2.6).toFixed(2))));
       const inicio = Number(cursor.toFixed(2));
       const fim = Number((cursor + duration).toFixed(2));
@@ -33,10 +39,59 @@ function buildTimedPhrases(paragrafos) {
   });
 }
 
-function withTimedPhrases(story) {
+function buildTimedWords(frases) {
+  let globalWordIndex = 0;
+  let fullText = '';
+
+  const palavras = frases.flatMap((frase) => {
+    const words = splitIntoWords(frase.texto);
+    const phraseDuration = Math.max(frase.fim - frase.inicio, 0.6);
+    const wordDuration = phraseDuration / Math.max(words.length, 1);
+
+    return words.map((palavra, ordemNaFrase) => {
+      const inicio = Number((frase.inicio + ordemNaFrase * wordDuration).toFixed(2));
+      const fim = Number((frase.inicio + (ordemNaFrase + 1) * wordDuration).toFixed(2));
+
+      if (fullText.length > 0) {
+        fullText += ' ';
+      }
+
+      const charInicio = fullText.length;
+      fullText += palavra;
+      const charFim = fullText.length;
+
+      const palavraEntry = {
+        indice: globalWordIndex,
+        fraseIndex: frase.indice,
+        paragrafoIndex: frase.paragrafoIndex,
+        ordemNaFrase,
+        texto: palavra,
+        inicio,
+        fim,
+        charInicio,
+        charFim,
+      };
+
+      globalWordIndex += 1;
+      return palavraEntry;
+    });
+  });
+
+  return {
+    palavras,
+    textoNarracao: fullText,
+  };
+}
+
+function withTimedData(story) {
+  const frases = buildTimedPhrases(story.paragrafos);
+  const { palavras, textoNarracao } = buildTimedWords(frases);
+
   return {
     ...story,
-    frases: buildTimedPhrases(story.paragrafos),
+    frases,
+    palavras,
+    textoNarracao,
   };
 }
 
@@ -101,7 +156,7 @@ export const stories = [
       'Na volta, com peixe fresco no balaio, Pedro entendeu que ler o mar parecia ler um livro vivo: toda página mudava rápido, mas quem presta atenção encontra caminho seguro para voltar.',
     ],
   },
-].map(withTimedPhrases);
+].map(withTimedData);
 
 export function getStoryById(id) {
   return stories.find((story) => story.id === id);

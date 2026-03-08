@@ -48,7 +48,13 @@ export default function AppShell({
             )}
 
             <div className='flex items-center gap-3'>
-              <div className={`rounded-xl px-2 py-1 ${darkHeader ? 'bg-white/10' : 'bg-leiae-bg/70'}`}>
+              <div
+                className={`rounded-xl px-2 py-1 ${
+                  darkHeader
+                    ? 'border border-leiae-bg/40 bg-leiae-bg/95 shadow-sm'
+                    : 'border border-leiae-dark/15 bg-leiae-bg/75'
+                }`}
+              >
                 <Logo onDark={darkHeader} className='h-auto w-[92px] sm:w-[108px]' priority />
               </div>
               <div>

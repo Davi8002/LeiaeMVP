@@ -8,7 +8,7 @@ export default function Logo({ onDark = false, className = '', priority = false 
       alt='Logo LeiaÊ'
       priority={priority}
       sizes='220px'
-      className={`${className} ${onDark ? 'brightness-0 invert' : ''}`.trim()}
+      className={`${className} ${onDark ? 'drop-shadow-sm' : ''}`.trim()}
     />
   );
 }

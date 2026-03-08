@@ -6,9 +6,9 @@
   onDecreaseSpeed,
   canIncreaseSpeed,
   canDecreaseSpeed,
-  audioSyncActive,
-  activePhraseIndex,
-  totalPhrases,
+  syncLabel,
+  activeWordIndex,
+  totalWords,
 }) {
   const buttonBase = 'inline-flex items-center justify-center rounded-full px-3 py-2 text-sm font-semibold transition';
 
@@ -45,13 +45,9 @@
       <div className='mt-3 flex flex-wrap items-center gap-3 text-sm font-semibold text-leiae-dark/80'>
         <span className='rounded-full border border-leiae-dark/15 bg-leiae-bg px-3 py-1'>Velocidade: {guidedSpeed.toFixed(2)}x</span>
         <span className='rounded-full border border-leiae-dark/15 bg-leiae-bg px-3 py-1'>
-          Frase: {Math.min(activePhraseIndex + 1, totalPhrases)}/{totalPhrases}
+          Palavra: {Math.min(activeWordIndex + 1, totalWords)}/{totalWords}
         </span>
-        {audioSyncActive ? (
-          <span className='rounded-full bg-leiae-accent px-3 py-1 text-leiae-bg'>Sincronizado com áudio</span>
-        ) : (
-          <span className='rounded-full border border-leiae-dark/15 bg-leiae-bg px-3 py-1'>Modo visual independente</span>
-        )}
+        <span className='rounded-full bg-leiae-accent px-3 py-1 text-leiae-bg'>{syncLabel}</span>
       </div>
     </section>
   );
