@@ -1,4 +1,6 @@
 ﻿import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { buildLastReadingHref } from '../data/readingSession';
 import Logo from './Logo';
 import BottomNav from './BottomNav';
 
@@ -22,12 +24,25 @@ export default function AppShell({
   readingHref = '/biblioteca',
   maxWidthClass = 'max-w-[430px] sm:max-w-[560px] md:max-w-4xl lg:max-w-6xl',
 }) {
-  const tabs = [
-    { id: 'home', label: 'Início', href: '/' },
-    { id: 'biblioteca', label: 'Biblioteca', href: '/biblioteca' },
-    { id: 'leitura', label: 'Leitura', href: readingHref },
-    { id: 'config', label: 'Ajustes', href: '/ajustes' },
-  ];
+  const [resolvedReadingHref, setResolvedReadingHref] = useState(readingHref);
+
+  useEffect(() => {
+    const isSpecificReading = readingHref.startsWith('/livro/');
+    const fallback = isSpecificReading ? readingHref : '/biblioteca';
+    const nextHref = isSpecificReading ? readingHref : buildLastReadingHref(fallback);
+
+    setResolvedReadingHref(nextHref);
+  }, [readingHref]);
+
+  const tabs = useMemo(
+    () => [
+      { id: 'home', label: 'Início', href: '/' },
+      { id: 'biblioteca', label: 'Biblioteca', href: '/biblioteca' },
+      { id: 'leitura', label: 'Leitura', href: resolvedReadingHref },
+      { id: 'config', label: 'Ajustes', href: '/ajustes' },
+    ],
+    [resolvedReadingHref],
+  );
 
   return (
     <main className='min-h-screen bg-grainWarm px-0 py-0 sm:px-4 sm:py-4 lg:px-8 lg:py-6'>
@@ -104,7 +119,7 @@ export default function AppShell({
 
         {showBottomNav ? (
           <div className='md:hidden'>
-            <BottomNav active={activeTab} readingHref={readingHref} />
+            <BottomNav active={activeTab} readingHref={resolvedReadingHref} />
           </div>
         ) : null}
       </div>

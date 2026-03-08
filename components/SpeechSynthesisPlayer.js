@@ -65,6 +65,7 @@ export default function SpeechSynthesisPlayer({
   onWordBoundary,
   onPlayStateChange,
   onRateChange,
+  compact = false,
 }) {
   const utteranceRef = useRef(null);
   const utteranceTokenRef = useRef(0);
@@ -345,26 +346,14 @@ export default function SpeechSynthesisPlayer({
     );
   }
 
-  return (
-    <section className='rounded-3xl border border-leiae-dark/10 bg-gradient-to-br from-white/95 via-leiae-paper to-[#f2ddc8] p-4 shadow-warm sm:p-5'>
-      <div className='flex flex-wrap items-center justify-between gap-3'>
-        <div>
-          <h2 className='font-display text-lg font-bold text-leiae-dark'>Player de leitura robotizada</h2>
-          <p className='text-sm text-leiae-text/75'>Controle a leitura como em um player de áudio/vídeo</p>
-        </div>
-
-        <span className='inline-flex items-center gap-2 rounded-full border border-leiae-dark/10 bg-white/80 px-3 py-1 text-xs font-semibold text-leiae-dark/80'>
-          <span className={`h-2.5 w-2.5 rounded-full ${isPlaying ? 'animate-pulseSoft bg-leiae-accent' : 'bg-leiae-dark/30'}`} aria-hidden='true' />
-          {isPlaying ? 'Reproduzindo' : isPaused ? 'Pausado' : 'Pronto'}
-        </span>
-      </div>
-
-      <div className='mt-4 flex flex-wrap items-center justify-center gap-2 sm:gap-3'>
+  const controls = (
+    <>
+      <div className='flex flex-wrap items-center justify-center gap-2 sm:gap-3'>
         <button
           type='button'
           onClick={() => handleJump(-8)}
           disabled={!canUse}
-          className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+          className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 sm:h-11 sm:w-11'
           aria-label='Voltar leitura'
         >
           <BackwardIcon />
@@ -374,7 +363,7 @@ export default function SpeechSynthesisPlayer({
           type='button'
           onClick={isPlaying ? handlePause : handlePlay}
           disabled={!canUse}
-          className='inline-flex h-14 w-14 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg shadow transition-all duration-200 hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-50'
+          className='inline-flex h-12 w-12 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg shadow transition-all duration-200 hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:w-14'
           aria-label={isPlaying ? 'Pausar leitura automática' : 'Iniciar leitura automática'}
         >
           {isPlaying ? <PauseIcon /> : <PlayIcon />}
@@ -384,14 +373,14 @@ export default function SpeechSynthesisPlayer({
           type='button'
           onClick={() => handleJump(8)}
           disabled={!canUse}
-          className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+          className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 sm:h-11 sm:w-11'
           aria-label='Avançar leitura'
         >
           <ForwardIcon />
         </button>
       </div>
 
-      <div className='mt-4 rounded-2xl border border-leiae-dark/10 bg-white/85 p-3 sm:p-4'>
+      <div className='mt-3 rounded-2xl border border-leiae-dark/10 bg-white/85 p-3'>
         <div className='flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-leiae-dark/75'>
           <span>Palavra {Math.min(currentWordIndex + 1, totalWords)}/{Math.max(totalWords, 1)}</span>
           <span>{Math.round(progressPercent)}%</span>
@@ -422,7 +411,7 @@ export default function SpeechSynthesisPlayer({
           <div className='h-full rounded-full bg-leiae-accent transition-all duration-200' style={{ width: `${progressPercent}%` }} />
         </div>
 
-        <div className='mt-3 flex flex-wrap items-center gap-2'>
+        <div className='mt-3 flex flex-wrap items-center justify-center gap-2'>
           <button
             type='button'
             onClick={() => handleRate(-0.1)}
@@ -449,8 +438,30 @@ export default function SpeechSynthesisPlayer({
       </div>
 
       {speechError ? (
-        <p className='mt-3 rounded-lg bg-leiae-accent/10 px-3 py-2 text-sm font-semibold text-leiae-dark'>{speechError}</p>
+        <p className='mt-2 rounded-lg bg-leiae-accent/10 px-3 py-2 text-xs font-semibold text-leiae-dark sm:text-sm'>{speechError}</p>
       ) : null}
+    </>
+  );
+
+  if (compact) {
+    return <div>{controls}</div>;
+  }
+
+  return (
+    <section className='rounded-3xl border border-leiae-dark/10 bg-gradient-to-br from-white/95 via-leiae-paper to-[#f2ddc8] p-4 shadow-warm sm:p-5'>
+      <div className='flex flex-wrap items-center justify-between gap-3'>
+        <div>
+          <h2 className='font-display text-lg font-bold text-leiae-dark'>Player de leitura robotizada</h2>
+          <p className='text-sm text-leiae-text/75'>Controle a leitura como em um player de áudio/vídeo</p>
+        </div>
+
+        <span className='inline-flex items-center gap-2 rounded-full border border-leiae-dark/10 bg-white/80 px-3 py-1 text-xs font-semibold text-leiae-dark/80'>
+          <span className={`h-2.5 w-2.5 rounded-full ${isPlaying ? 'animate-pulseSoft bg-leiae-accent' : 'bg-leiae-dark/30'}`} aria-hidden='true' />
+          {isPlaying ? 'Reproduzindo' : isPaused ? 'Pausado' : 'Pronto'}
+        </span>
+      </div>
+
+      {controls}
     </section>
   );
 }

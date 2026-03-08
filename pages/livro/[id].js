@@ -8,13 +8,43 @@ import AudioPlayer from '../../components/AudioPlayer';
 import GuidedReadingControls from '../../components/GuidedReadingControls';
 import GuidedReadingText from '../../components/GuidedReadingText';
 import SpeechSynthesisPlayer from '../../components/SpeechSynthesisPlayer';
-import VoiceReadingSelector from '../../components/VoiceReadingSelector';
 import {
   defaultReadingPreferences,
   loadReadingPreferences,
   saveReadingPreferences,
 } from '../../data/readingPreferences';
+import { loadReadingSession, saveReadingSession } from '../../data/readingSession';
 import { getStoryById } from '../../data/stories';
+
+function PanelToggleIcon({ collapsed }) {
+  return (
+    <svg viewBox='0 0 24 24' className='h-5 w-5' fill='none' stroke='currentColor' strokeWidth='2'>
+      {collapsed ? (
+        <>
+          <path d='M6 8h12M6 12h8M6 16h12' strokeLinecap='round' />
+          <path d='M15 10l3 2-3 2' strokeLinecap='round' strokeLinejoin='round' />
+        </>
+      ) : (
+        <>
+          <path d='M6 8h12M6 12h8M6 16h12' strokeLinecap='round' />
+          <path d='M18 10l-3 2 3 2' strokeLinecap='round' strokeLinejoin='round' />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function FullscreenIcon({ active }) {
+  return (
+    <svg viewBox='0 0 24 24' className='h-5 w-5' fill='none' stroke='currentColor' strokeWidth='2'>
+      {active ? (
+        <path d='M9 4H4v5M20 9V4h-5M15 20h5v-5M4 15v5h5' strokeLinecap='round' strokeLinejoin='round' />
+      ) : (
+        <path d='M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5' strokeLinecap='round' strokeLinejoin='round' />
+      )}
+    </svg>
+  );
+}
 
 function getWordIndexByTime(words, time) {
   if (!words?.length) return 0;
@@ -66,7 +96,7 @@ export default function LeituraPage() {
   const pageTitle = story ? `${story.titulo} | LeiaÊ` : 'Leitura | LeiaÊ';
 
   const roboticVoiceActive = voiceMode === 'robotic';
-  const compactPanel = controlsCollapsed || focusMode;
+  const showSidePanel = !controlsCollapsed;
 
   const audioSyncActive = audioPlaying && audioDuration > 0 && (story?.palavras?.length ?? 0) > 0;
   const speechSyncActive = roboticVoiceActive && speechPlaying && (story?.palavras?.length ?? 0) > 0;
@@ -106,28 +136,54 @@ export default function LeituraPage() {
   }, [preferencesLoaded, fontScale, highContrast, focusMode, voiceMode, voiceRate, guidedSpeed]);
 
   useEffect(() => {
-    if (!story) return;
+    if (!story || !router.isReady) return;
+
+    const queryWord = Number(router.query.w);
+    let initialWordIndex = 0;
+
+    if (Number.isFinite(queryWord) && queryWord >= 0) {
+      initialWordIndex = Math.floor(queryWord);
+    } else {
+      const session = loadReadingSession();
+      if (session?.storyId === story.id) {
+        initialWordIndex = session.wordIndex;
+      }
+    }
+
+    const maxWordIndex = Math.max((story.palavras?.length ?? 1) - 1, 0);
 
     setControlsCollapsed(false);
     setGuidedPlaying(false);
-    setGuidedWordIndex(0);
+    setGuidedWordIndex(Math.min(initialWordIndex, maxWordIndex));
     setAudioCurrentTime(0);
     setAudioDuration(0);
     setAudioPlaying(false);
     setSpeechPlaying(false);
-  }, [story]);
+  }, [story, router.isReady, router.query.w]);
 
   useEffect(() => {
-    if (!roboticVoiceActive || controlsCollapsed) {
+    if (!story) return;
+
+    const timer = setTimeout(() => {
+      saveReadingSession({
+        storyId: story.id,
+        wordIndex: guidedWordIndex,
+      });
+    }, 240);
+
+    return () => clearTimeout(timer);
+  }, [guidedWordIndex, story]);
+
+  useEffect(() => {
+    if (!roboticVoiceActive) {
       setSpeechPlaying(false);
     }
-  }, [controlsCollapsed, roboticVoiceActive]);
+  }, [roboticVoiceActive]);
 
   useEffect(() => {
-    if (compactPanel) {
-      setAudioPlaying(false);
-    }
-  }, [compactPanel]);
+    if (showSidePanel) return;
+    setAudioPlaying(false);
+  }, [showSidePanel]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -251,10 +307,6 @@ export default function LeituraPage() {
   const readingCardTone = highContrast
     ? 'border-leiae-bg/25 bg-leiae-dark text-leiae-bg shadow-none'
     : 'border-leiae-dark/10 bg-white/90 text-leiae-text shadow-card';
-  const focusReadingClass = focusMode ? 'mx-auto max-w-3xl ring-2 ring-leiae-accent/25' : '';
-  const gridClass = compactPanel
-    ? 'grid gap-4 lg:grid-cols-[280px,1fr]'
-    : 'grid gap-4 lg:grid-cols-[320px,1fr] xl:grid-cols-[340px,1fr]';
 
   return (
     <>
@@ -271,52 +323,13 @@ export default function LeituraPage() {
         darkHeader
         showTopNav={false}
         backHref='/biblioteca'
-        readingHref={`/livro/${story.id}`}
+        readingHref={`/livro/${story.id}?w=${guidedWordIndex}`}
         maxWidthClass='max-w-[430px] sm:max-w-[700px] md:max-w-5xl lg:max-w-6xl'
       >
-        <section ref={readingSurfaceRef} className={`rounded-3xl transition ${pageTone} ${isFullscreen ? 'min-h-screen p-4 sm:p-6' : 'p-3 sm:p-4'}`}>
-          <div className='mb-4 rounded-2xl border border-leiae-dark/10 bg-white/70 p-3 shadow-card'>
-            <div className='flex flex-wrap items-center justify-between gap-2'>
-              <div>
-                <p className='text-xs font-semibold uppercase tracking-[0.12em] text-leiae-dark/60'>Leitura organizada</p>
-                <p className='text-sm font-semibold text-leiae-dark/85'>Texto sempre visível com controles de app moderno</p>
-              </div>
-
-              <div className='flex flex-wrap items-center gap-2'>
-                <button
-                  type='button'
-                  onClick={() => setControlsCollapsed((previous) => !previous)}
-                  className='rounded-full border border-leiae-dark/20 px-3 py-2 text-xs font-semibold text-leiae-dark transition hover:bg-leiae-bg'
-                >
-                  {controlsCollapsed ? 'Expandir painel' : 'Recolher painel'}
-                </button>
-
-                <button
-                  type='button'
-                  onClick={() => setFocusMode((previous) => !previous)}
-                  className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-                    focusMode
-                      ? 'bg-leiae-accent text-leiae-bg'
-                      : 'border border-leiae-dark/20 text-leiae-dark hover:bg-leiae-bg'
-                  }`}
-                >
-                  {focusMode ? 'Sair do foco' : 'Modo foco'}
-                </button>
-
-                <button
-                  type='button'
-                  onClick={toggleFullscreen}
-                  className='rounded-full border border-leiae-dark/20 px-3 py-2 text-xs font-semibold text-leiae-dark transition hover:bg-leiae-bg'
-                >
-                  {isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className={gridClass}>
-            <aside className='space-y-4'>
-              {!compactPanel ? (
+        <section ref={readingSurfaceRef} className={`rounded-3xl p-3 transition sm:p-4 ${pageTone}`}>
+          <div className={`grid gap-4 ${showSidePanel ? 'lg:grid-cols-[300px,1fr]' : ''}`}>
+            {showSidePanel ? (
+              <aside className='space-y-4'>
                 <div className={`rounded-2xl border p-4 ${metaCardTone}`}>
                   <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${highContrast ? 'text-leiae-bg/75' : 'text-leiae-dark/60'}`}>
                     {story.nivel} | {story.duracao}
@@ -326,77 +339,40 @@ export default function LeituraPage() {
                   </h1>
                   <p className={`text-sm ${highContrast ? 'text-leiae-bg/85' : 'text-leiae-text/80'}`}>{story.autor}</p>
                 </div>
-              ) : (
-                <div className='rounded-2xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card'>
-                  <p className='text-sm font-semibold text-leiae-dark/80'>Painel compacto ativo</p>
-                  <p className='mt-1 text-xs text-leiae-dark/70'>Mostrando apenas controles essenciais para leitura.</p>
-                </div>
-              )}
 
-              {!controlsCollapsed ? (
-                <>
-                  <VoiceReadingSelector value={voiceMode} onChange={setVoiceMode} />
+                <AccessibilityControls
+                  fontScale={fontScale}
+                  setFontScale={setFontScale}
+                  highContrast={highContrast}
+                  setHighContrast={setHighContrast}
+                  focusMode={focusMode}
+                  setFocusMode={setFocusMode}
+                />
 
-                  <AccessibilityControls
-                    fontScale={fontScale}
-                    setFontScale={setFontScale}
-                    highContrast={highContrast}
-                    setHighContrast={setHighContrast}
-                    focusMode={focusMode}
-                    setFocusMode={setFocusMode}
-                  />
+                <GuidedReadingControls
+                  guidedPlaying={guidedPlaying}
+                  onToggleGuided={toggleGuided}
+                  guidedSpeed={guidedSpeed}
+                  onIncreaseSpeed={increaseSpeed}
+                  onDecreaseSpeed={decreaseSpeed}
+                  canIncreaseSpeed={canIncreaseSpeed}
+                  canDecreaseSpeed={canDecreaseSpeed}
+                  syncLabel={syncLabel}
+                  activeWordIndex={guidedWordIndex}
+                  totalWords={totalWords}
+                />
 
-                  {!focusMode ? (
-                    <GuidedReadingControls
-                      guidedPlaying={guidedPlaying}
-                      onToggleGuided={toggleGuided}
-                      guidedSpeed={guidedSpeed}
-                      onIncreaseSpeed={increaseSpeed}
-                      onDecreaseSpeed={decreaseSpeed}
-                      canIncreaseSpeed={canIncreaseSpeed}
-                      canDecreaseSpeed={canDecreaseSpeed}
-                      syncLabel={syncLabel}
-                      activeWordIndex={guidedWordIndex}
-                      totalWords={totalWords}
-                    />
-                  ) : null}
+                <AudioPlayer
+                  src={story.audio}
+                  title={story.titulo}
+                  onTimeUpdate={setAudioCurrentTime}
+                  onPlayStateChange={setAudioPlaying}
+                  onDurationChange={setAudioDuration}
+                />
+              </aside>
+            ) : null}
 
-                  {!focusMode ? (
-                    <AudioPlayer
-                      src={story.audio}
-                      title={story.titulo}
-                      onTimeUpdate={setAudioCurrentTime}
-                      onPlayStateChange={setAudioPlaying}
-                      onDurationChange={setAudioDuration}
-                    />
-                  ) : null}
-
-                  {roboticVoiceActive ? (
-                    <SpeechSynthesisPlayer
-                      text={story.textoNarracao}
-                      words={story.palavras}
-                      activeWordIndex={guidedWordIndex}
-                      initialRate={voiceRate}
-                      onWordBoundary={setGuidedWordIndex}
-                      onPlayStateChange={setSpeechPlaying}
-                      onRateChange={setVoiceRate}
-                    />
-                  ) : (
-                    <section className='rounded-2xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card'>
-                      <p className='text-sm font-semibold text-leiae-dark'>Leitura humanizada ainda não disponível.</p>
-                      <p className='mt-1 text-xs text-leiae-dark/70'>Estamos preparando narrativas com voz humana para uma próxima versão.</p>
-                    </section>
-                  )}
-                </>
-              ) : (
-                <section className='rounded-2xl border border-leiae-dark/10 bg-leiae-paper p-4 text-sm text-leiae-dark/80 shadow-card'>
-                  <p className='font-semibold'>Controles recolhidos</p>
-                  <p className='mt-1'>Use o botão “Expandir painel” para acessar voz, acessibilidade e reprodução.</p>
-                </section>
-              )}
-            </aside>
-
-            <article className={`rounded-2xl border p-5 transition sm:p-6 ${readingCardTone} ${focusReadingClass}`}>
+            <article className={`rounded-2xl border p-5 transition sm:p-6 ${readingCardTone} ${focusMode ? 'ring-2 ring-leiae-accent/25' : ''}`}>
               <div className='mb-4 flex flex-wrap items-center justify-between gap-2'>
                 <h2 className={`font-display text-2xl ${highContrast ? 'text-leiae-bg' : 'text-leiae-dark'}`}>Leitura</h2>
                 <span className='rounded-full border border-leiae-dark/15 bg-leiae-paper/70 px-3 py-1 text-xs font-semibold text-leiae-dark/70'>
@@ -412,8 +388,88 @@ export default function LeituraPage() {
               />
             </article>
           </div>
+
+          <section className='sticky bottom-2 z-30 mt-4 rounded-2xl border border-leiae-dark/15 bg-leiae-paper/95 p-3 shadow-warm backdrop-blur sm:p-4'>
+            <div className='grid grid-cols-[auto,1fr,auto] items-start gap-3'>
+              <button
+                type='button'
+                onClick={() => setControlsCollapsed((previous) => !previous)}
+                className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg'
+                aria-label={showSidePanel ? 'Recolher painel lateral' : 'Expandir painel lateral'}
+              >
+                <PanelToggleIcon collapsed={!showSidePanel} />
+              </button>
+
+              <div className='min-w-0 space-y-2'>
+                <div className='flex flex-wrap items-center justify-center gap-2 text-xs font-semibold sm:justify-between'>
+                  <span className='rounded-full bg-leiae-dark/10 px-2.5 py-1 text-leiae-dark/75'>Leitura organizada</span>
+                  <span className='rounded-full bg-leiae-accent/10 px-2.5 py-1 text-leiae-dark/80'>Texto sempre visível</span>
+                  <button
+                    type='button'
+                    onClick={() => setFocusMode((previous) => !previous)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
+                      focusMode
+                        ? 'bg-leiae-accent text-leiae-bg'
+                        : 'border border-leiae-dark/20 bg-white text-leiae-dark hover:bg-leiae-bg'
+                    }`}
+                  >
+                    {focusMode ? 'Foco ativo' : 'Modo foco'}
+                  </button>
+                </div>
+
+                <div className='flex flex-wrap items-center justify-center gap-2'>
+                  <button
+                    type='button'
+                    onClick={() => setVoiceMode('robotic')}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      roboticVoiceActive
+                        ? 'bg-leiae-accent text-leiae-bg'
+                        : 'border border-leiae-dark/20 bg-white text-leiae-dark hover:bg-leiae-bg'
+                    }`}
+                  >
+                    Robotizada
+                  </button>
+
+                  <button
+                    type='button'
+                    disabled
+                    className='rounded-full border border-leiae-dark/20 bg-white/70 px-3 py-1.5 text-xs font-semibold text-leiae-dark/65'
+                  >
+                    Humanizada (em breve)
+                  </button>
+                </div>
+
+                {roboticVoiceActive ? (
+                  <SpeechSynthesisPlayer
+                    text={story.textoNarracao}
+                    words={story.palavras}
+                    activeWordIndex={guidedWordIndex}
+                    initialRate={voiceRate}
+                    onWordBoundary={setGuidedWordIndex}
+                    onPlayStateChange={setSpeechPlaying}
+                    onRateChange={setVoiceRate}
+                    compact
+                  />
+                ) : (
+                  <div className='rounded-2xl border border-leiae-dark/10 bg-white/80 px-3 py-2 text-center text-xs font-semibold text-leiae-dark/75'>
+                    Leitura humanizada ainda não disponível.
+                  </div>
+                )}
+              </div>
+
+              <button
+                type='button'
+                onClick={toggleFullscreen}
+                className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg'
+                aria-label={isFullscreen ? 'Sair da tela cheia' : 'Ativar tela cheia'}
+              >
+                <FullscreenIcon active={isFullscreen} />
+              </button>
+            </div>
+          </section>
         </section>
       </AppShell>
     </>
   );
 }
+
