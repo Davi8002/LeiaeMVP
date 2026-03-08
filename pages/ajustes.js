@@ -142,7 +142,7 @@ export default function AjustesPage() {
             <section className='rounded-2xl border border-leiae-dark/10 bg-white/75 p-4'>
               <p className='text-sm font-semibold text-leiae-dark'>Modo de voz padrão</p>
               <div className='mt-3 grid gap-2 sm:grid-cols-2'>
-                <label className={`rounded-xl border px-3 py-3 text-sm transition ${voiceMode === 'robotic' ? 'border-leiae-accent bg-leiae-accent/10' : 'border-leiae-dark/10'}`}>
+                <label className='rounded-xl border border-leiae-accent bg-leiae-accent/10 px-3 py-3 text-sm transition'>
                   <input
                     type='radio'
                     name='default-voice-mode'
@@ -154,17 +154,9 @@ export default function AjustesPage() {
                   Robotizada
                 </label>
 
-                <label className={`rounded-xl border px-3 py-3 text-sm transition ${voiceMode === 'humanized' ? 'border-leiae-accent bg-leiae-accent/10' : 'border-leiae-dark/10'}`}>
-                  <input
-                    type='radio'
-                    name='default-voice-mode'
-                    value='humanized'
-                    checked={voiceMode === 'humanized'}
-                    onChange={() => setVoiceMode('humanized')}
-                    className='mr-2 accent-leiae-accent'
-                  />
+                <div className='rounded-xl border border-leiae-dark/10 bg-leiae-paper/70 px-3 py-3 text-sm text-leiae-dark/60'>
                   Humanizada (em breve)
-                </label>
+                </div>
               </div>
             </section>
 
@@ -211,7 +203,7 @@ export default function AjustesPage() {
             </div>
 
             <div className='rounded-2xl border border-leiae-dark/10 bg-white/70 p-4 text-sm text-leiae-dark/80'>
-              <p>Modo de voz padrão: <strong>{voiceMode === 'robotic' ? 'Robotizada' : 'Humanizada (em breve)'}</strong></p>
+              <p>Modo de voz padrão: <strong>Robotizada</strong></p>
               <p className='mt-1'>Velocidade da voz: <strong>{voiceRate.toFixed(1)}x</strong></p>
               <p className='mt-1'>Leitura guiada: <strong>{guidedSpeed.toFixed(2)}x</strong></p>
             </div>
@@ -223,3 +215,6 @@ export default function AjustesPage() {
     </>
   );
 }
+
+
+

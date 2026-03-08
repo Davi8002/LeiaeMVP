@@ -282,20 +282,34 @@ export default function SpeechSynthesisPlayer({
     if (!supported || !canUse) return;
 
     if (window.speechSynthesis.paused) {
+      setStatus('playing');
+      onPlayStateChange?.(true);
       window.speechSynthesis.resume();
       return;
     }
 
+    setStatus('playing');
+    onPlayStateChange?.(true);
     speakFrom(seekWordIndex);
-  }, [canUse, seekWordIndex, speakFrom, supported]);
+  }, [canUse, onPlayStateChange, seekWordIndex, speakFrom, supported]);
 
   const handlePause = useCallback(() => {
     if (!supported || !canUse) return;
 
     if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+      setStatus('paused');
+      onPlayStateChange?.(false);
       window.speechSynthesis.pause();
+
+      if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => {
+          if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+            window.speechSynthesis.pause();
+          }
+        });
+      }
     }
-  }, [canUse, supported]);
+  }, [canUse, onPlayStateChange, supported]);
 
   const restartFromIndex = useCallback(
     (index, options = {}) => {
@@ -568,6 +582,8 @@ export default function SpeechSynthesisPlayer({
     </section>
   );
 }
+
+
 
 
 

@@ -421,7 +421,11 @@ export default function LeituraPage() {
         readingHref={`/livro/${story.id}?w=${guidedWordIndex}`}
         maxWidthClass='max-w-[430px] sm:max-w-[700px] md:max-w-5xl lg:max-w-6xl'
       >
-        <section ref={readingSurfaceRef} className={`rounded-3xl p-3 transition sm:p-4 ${pageTone}`}>
+        <section
+          ref={readingSurfaceRef}
+          className={`rounded-3xl p-3 transition sm:p-4 ${pageTone} ${isFullscreen ? 'h-screen overflow-y-auto overscroll-y-contain touch-pan-y' : ''}`}
+          style={isFullscreen ? { WebkitOverflowScrolling: 'touch' } : undefined}
+        >
           <div className={`grid gap-4 ${showSidePanel ? 'lg:grid-cols-[300px,1fr]' : ''}`}>
             {showSidePanel ? (
               <aside className='space-y-4'>
@@ -555,9 +559,7 @@ export default function LeituraPage() {
               </button>
 
               <div className='min-w-0 space-y-2'>
-                <div className='flex flex-wrap items-center justify-center gap-2 text-xs font-semibold sm:justify-between'>
-                  <span className='rounded-full bg-leiae-dark/10 px-2.5 py-1 text-leiae-dark/75'>Leitura organizada</span>
-                  <span className='rounded-full bg-leiae-accent/10 px-2.5 py-1 text-leiae-dark/80'>Texto sempre visível</span>
+                <div className='flex flex-wrap items-center justify-end gap-2 text-xs font-semibold'>
                   <button
                     type='button'
                     onClick={() => setFocusMode((previous) => !previous)}
@@ -627,6 +629,11 @@ export default function LeituraPage() {
     </>
   );
 }
+
+
+
+
+
 
 
 

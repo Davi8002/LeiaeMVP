@@ -22,7 +22,7 @@ export function normalizeReadingPreferences(preferences = {}) {
     fontScale: Number.isFinite(fontScale) ? Number(clamp(fontScale, 0.9, 1.8).toFixed(1)) : defaultReadingPreferences.fontScale,
     highContrast: Boolean(preferences.highContrast),
     focusMode: Boolean(preferences.focusMode),
-    voiceMode: preferences.voiceMode === 'humanized' ? 'humanized' : 'robotic',
+    voiceMode: 'robotic',
     voiceRate: Number.isFinite(voiceRate) ? Number(clamp(voiceRate, 0.6, 2).toFixed(1)) : defaultReadingPreferences.voiceRate,
     guidedSpeed: Number.isFinite(guidedSpeed) ? Number(clamp(guidedSpeed, 0.5, 3).toFixed(2)) : defaultReadingPreferences.guidedSpeed,
   };
@@ -54,3 +54,4 @@ export function saveReadingPreferences(preferences) {
     // Ignora falha de armazenamento local.
   }
 }
+
