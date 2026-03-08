@@ -1,29 +1,41 @@
 import Link from 'next/link';
+import AppShell from '../components/AppShell';
 import Logo from '../components/Logo';
 
 export default function HomePage() {
   return (
-    <main className='min-h-screen bg-leiae-bg px-6 py-12 text-leiae-text'>
-      <section className='mx-auto flex w-full max-w-5xl flex-col items-start gap-8 rounded-3xl border border-leiae-dark/10 bg-gradient-to-br from-leiae-bg via-[#f4e2cc] to-[#efcfb2] p-8 shadow-warm md:p-12'>
-        <Logo priority className='h-auto w-[190px] sm:w-[220px]' />
+    <AppShell title='Leia\u00ca' subtitle='Ler com apoio, no seu ritmo.' activeTab='home' darkHeader>
+      <section className='space-y-4'>
+        <div className='rounded-3xl border border-leiae-dark/10 bg-gradient-to-br from-leiae-paper via-leiae-bg to-[#efcfb2] p-5 shadow-card'>
+          <div className='rounded-2xl border border-leiae-dark/10 bg-white/70 p-4'>
+            <Logo priority className='mx-auto h-auto w-[210px]' />
+          </div>
 
-        <div className='max-w-2xl'>
-          <p className='font-bold uppercase tracking-[0.2em] text-leiae-accent'>Plataforma de leitura</p>
-          <h1 className='mt-3 font-display text-4xl leading-tight text-leiae-dark sm:text-5xl'>LeiaE</h1>
-          <p className='mt-4 text-2xl font-semibold text-leiae-dark'>Ler com apoio, no seu ritmo.</p>
-          <p className='mt-4 text-lg leading-relaxed'>
-            LeiaE e um espaco de leitura digital pensado para acolher diferentes ritmos. Escolha uma historia, ajuste a forma como quer ler e use o audio para acompanhar cada pagina com conforto.
+          <h1 className='mt-5 font-display text-3xl font-bold leading-tight text-leiae-dark'>Ler com apoio, no seu ritmo.</h1>
+          <p className='mt-3 text-base text-leiae-text/90'>
+            Um aplicativo de leitura acolhedor com recursos de acessibilidade para desenvolver o habito de leitura sem pressa.
           </p>
+
+          <Link
+            href='/biblioteca'
+            className='mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-leiae-accent px-5 py-3 text-base font-bold text-leiae-bg transition hover:bg-leiae-dark'
+          >
+            Explorar Biblioteca
+          </Link>
         </div>
 
-        <Link
-          href='/biblioteca'
-          className='rounded-xl bg-leiae-accent px-7 py-4 text-lg font-bold text-leiae-bg transition hover:bg-leiae-dark'
-        >
-          Explorar Biblioteca
-        </Link>
+        <div className='grid grid-cols-2 gap-3'>
+          <article className='rounded-2xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card'>
+            <p className='text-sm font-semibold text-leiae-dark/70'>Ajuste instantaneo</p>
+            <p className='mt-1 text-xl font-bold text-leiae-dark'>Fonte e contraste</p>
+          </article>
+          <article className='rounded-2xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card'>
+            <p className='text-sm font-semibold text-leiae-dark/70'>Leitura guiada</p>
+            <p className='mt-1 text-xl font-bold text-leiae-dark'>Audio local MP3</p>
+          </article>
+        </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
 

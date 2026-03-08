@@ -1,32 +1,51 @@
-import Link from 'next/link';
-import Logo from '../components/Logo';
+import AppShell from '../components/AppShell';
 import StoryCard from '../components/StoryCard';
 import { stories } from '../data/stories';
 
+function SearchIcon() {
+  return (
+    <svg viewBox='0 0 24 24' className='h-5 w-5' fill='none' stroke='currentColor' strokeWidth='2'>
+      <circle cx='11' cy='11' r='7' />
+      <path d='M20 20l-3.5-3.5' strokeLinecap='round' />
+    </svg>
+  );
+}
+
 export default function BibliotecaPage() {
   return (
-    <main className='min-h-screen bg-leiae-bg px-6 py-10 text-leiae-text'>
-      <section className='mx-auto w-full max-w-6xl'>
-        <header className='mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center'>
-          <div>
-            <Logo className='h-auto w-[160px] sm:w-[190px]' />
-            <h1 className='mt-4 font-display text-4xl text-leiae-dark'>Biblioteca</h1>
-            <p className='mt-2 max-w-2xl text-lg'>
-              Escolha uma historia curta e leia no seu ritmo, com apoio de recursos de acessibilidade.
-            </p>
-          </div>
+    <AppShell
+      title='Leia\u00ca'
+      subtitle='Biblioteca de historias'
+      activeTab='biblioteca'
+      darkHeader
+      maxWidthClass='max-w-6xl'
+      readingHref='/biblioteca'
+    >
+      <section className='space-y-5'>
+        <div className='rounded-2xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card'>
+          <p className='text-sm font-semibold uppercase tracking-[0.12em] text-leiae-dark/65'>Biblioteca</p>
+          <h1 className='mt-1 font-display text-3xl font-bold text-leiae-dark'>Escolha sua proxima leitura</h1>
 
-          <Link href='/' className='rounded-lg border border-leiae-dark/20 px-4 py-2 font-bold text-leiae-dark hover:bg-white/70'>
-            Voltar ao inicio
-          </Link>
-        </header>
+          <label className='mt-4 flex items-center gap-2 rounded-xl border border-leiae-dark/10 bg-white/70 px-3 py-2 text-leiae-dark/70'>
+            <SearchIcon />
+            <input
+              type='text'
+              readOnly
+              value='Buscar historia, autor ou nivel'
+              className='w-full bg-transparent text-sm outline-none'
+              aria-label='Campo de busca visual'
+            />
+          </label>
+        </div>
 
-        <div className='grid gap-5 md:grid-cols-2'>
+        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'>
           {stories.map((story) => (
             <StoryCard key={story.id} story={story} />
           ))}
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
+
+

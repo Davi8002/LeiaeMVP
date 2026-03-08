@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 html,
+body,
+#__next {
+  min-height: 100%;
+}
+
+html,
 body {
   padding: 0;
   margin: 0;
@@ -13,7 +19,7 @@ body {
 }
 
 body {
-  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  font-family: 'Segoe UI', 'Trebuchet MS', sans-serif;
   color: #452a15;
   background: #f7ede1;
 }
@@ -21,4 +27,21 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+input::placeholder {
+  color: rgba(69, 42, 21, 0.5);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(69, 42, 21, 0.25);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(247, 237, 225, 0.85);
 }

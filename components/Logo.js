@@ -6,13 +6,13 @@ export default function Logo({ onDark = false, className = '', priority = false 
   return (
     <Image
       src={src}
-      alt='Logo LeiaE'
+      alt='Logo Leia\u00CA'
       width={220}
       height={92}
       priority={priority}
+      sizes='220px'
       className={className}
     />
   );
 }
-
 

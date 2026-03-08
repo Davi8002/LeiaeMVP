@@ -1,9 +1,9 @@
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useMemo, useState } from 'react';
+import AppShell from '../../components/AppShell';
 import AccessibilityControls from '../../components/AccessibilityControls';
 import AudioPlayer from '../../components/AudioPlayer';
-import Logo from '../../components/Logo';
 import { getStoryById } from '../../data/stories';
 
 export default function LeituraPage() {
@@ -33,27 +33,34 @@ export default function LeituraPage() {
     );
   }
 
-  const readingClass = highContrast
-    ? 'bg-leiae-dark text-leiae-bg border-leiae-bg/30'
-    : 'bg-white/80 text-leiae-text border-leiae-dark/15';
+  const pageTone = highContrast ? 'bg-[#1d1009] text-leiae-bg' : focusMode ? 'bg-[#f0dfca]' : 'bg-leiae-paper';
+  const metaCardTone = highContrast
+    ? 'border-leiae-bg/25 bg-[#3a1f12] text-leiae-bg'
+    : 'border-leiae-dark/10 bg-leiae-paper/95 text-leiae-dark';
+  const readingCardTone = highContrast
+    ? 'border-leiae-bg/25 bg-leiae-dark text-leiae-bg shadow-none'
+    : 'border-leiae-dark/10 bg-white/90 text-leiae-text shadow-card';
 
   return (
-    <main className={`min-h-screen px-6 py-10 transition ${focusMode ? 'bg-[#f1dec4]' : 'bg-leiae-bg'}`}>
-      <section className='mx-auto flex w-full max-w-4xl flex-col gap-5'>
-        <header className='flex flex-wrap items-center justify-between gap-4'>
-          <Logo onDark={highContrast} className='h-auto w-[160px]' />
-
-          <Link
-            href='/biblioteca'
-            className={`rounded-lg px-4 py-2 font-bold transition ${
-              highContrast
-                ? 'border border-leiae-bg/40 text-leiae-bg hover:bg-leiae-bg/10'
-                : 'border border-leiae-dark/20 text-leiae-dark hover:bg-white/60'
-            }`}
-          >
-            Voltar para biblioteca
-          </Link>
-        </header>
+    <AppShell
+      title="Leia\u00CA"
+      subtitle="Modo leitura"
+      activeTab='leitura'
+      darkHeader
+      showTopNav={false}
+      backHref='/biblioteca'
+      readingHref={`/livro/${story.id}`}
+    >
+      <section className={`space-y-4 rounded-3xl p-3 transition ${pageTone}`}>
+        <div className={`rounded-2xl border p-4 ${metaCardTone}`}>
+          <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${highContrast ? 'text-leiae-bg/75' : 'text-leiae-dark/60'}`}>
+            {story.nivel} | {story.duracao}
+          </p>
+          <h1 className={`mt-1 font-display text-3xl font-bold ${highContrast ? 'text-leiae-bg' : 'text-leiae-dark'}`}>
+            {story.titulo}
+          </h1>
+          <p className={`text-sm ${highContrast ? 'text-leiae-bg/85' : 'text-leiae-text/80'}`}>{story.autor}</p>
+        </div>
 
         <AccessibilityControls
           fontScale={fontScale}
@@ -64,13 +71,9 @@ export default function LeituraPage() {
           setFocusMode={setFocusMode}
         />
 
-        <article className={`rounded-2xl border p-6 shadow-warm transition ${readingClass}`}>
-          <p className={`mb-2 text-sm font-bold uppercase tracking-[0.2em] ${highContrast ? 'text-leiae-bg/80' : 'text-leiae-accent'}`}>
-            {story.nivel} � {story.duracao}
-          </p>
-          <h1 className='font-display text-3xl sm:text-4xl'>{story.titulo}</h1>
-
-          <div className='mt-6 space-y-5 leading-relaxed' style={{ fontSize: `${fontScale}rem` }}>
+        <article className={`rounded-2xl border p-5 transition ${readingCardTone}`}>
+          <h2 className={`font-display text-2xl ${highContrast ? 'text-leiae-bg' : 'text-leiae-dark'}`}>Leitura</h2>
+          <div className='mt-4 space-y-5 leading-relaxed' style={{ fontSize: `${fontScale}rem` }}>
             {story.paragrafos.map((paragrafo, index) => (
               <p key={`${story.id}-${index}`}>{paragrafo}</p>
             ))}
@@ -79,7 +82,8 @@ export default function LeituraPage() {
 
         <AudioPlayer src={story.audio} title={story.titulo} />
       </section>
-    </main>
+    </AppShell>
   );
 }
+
 
