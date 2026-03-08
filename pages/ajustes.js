@@ -35,6 +35,7 @@ export default function AjustesPage() {
   const [highContrast, setHighContrast] = useState(defaultReadingPreferences.highContrast);
   const [focusMode, setFocusMode] = useState(defaultReadingPreferences.focusMode);
   const [voiceMode, setVoiceMode] = useState(defaultReadingPreferences.voiceMode);
+  const [voiceGender, setVoiceGender] = useState(defaultReadingPreferences.voiceGender);
   const [voiceRate, setVoiceRate] = useState(defaultReadingPreferences.voiceRate);
   const [guidedSpeed, setGuidedSpeed] = useState(defaultReadingPreferences.guidedSpeed);
   const [savedNotice, setSavedNotice] = useState('');
@@ -46,6 +47,7 @@ export default function AjustesPage() {
     setHighContrast(preferences.highContrast);
     setFocusMode(preferences.focusMode);
     setVoiceMode(preferences.voiceMode);
+    setVoiceGender(preferences.voiceGender);
     setVoiceRate(preferences.voiceRate);
     setGuidedSpeed(preferences.guidedSpeed);
     setLoaded(true);
@@ -59,6 +61,7 @@ export default function AjustesPage() {
       highContrast,
       focusMode,
       voiceMode,
+      voiceGender,
       voiceRate,
       guidedSpeed,
     });
@@ -71,7 +74,7 @@ export default function AjustesPage() {
     }, 1600);
 
     return () => clearTimeout(timer);
-  }, [loaded, fontScale, highContrast, focusMode, voiceMode, voiceRate, guidedSpeed]);
+  }, [loaded, fontScale, highContrast, focusMode, voiceMode, voiceGender, voiceRate, guidedSpeed]);
 
   const previewTone = highContrast ? 'bg-leiae-dark text-leiae-bg border-leiae-bg/20' : 'bg-white text-leiae-text border-leiae-dark/10';
   const previewTextSize = useMemo(() => ({ fontSize: `${fontScale}rem` }), [fontScale]);
@@ -83,6 +86,7 @@ export default function AjustesPage() {
     setHighContrast(defaults.highContrast);
     setFocusMode(defaults.focusMode);
     setVoiceMode(defaults.voiceMode);
+    setVoiceGender(defaults.voiceGender);
     setVoiceRate(defaults.voiceRate);
     setGuidedSpeed(defaults.guidedSpeed);
   };
@@ -159,6 +163,35 @@ export default function AjustesPage() {
                 </div>
               </div>
             </section>
+            <section className='rounded-2xl border border-leiae-dark/10 bg-white/75 p-4'>
+              <p className='text-sm font-semibold text-leiae-dark'>Timbre da voz robotizada</p>
+              <div className='mt-3 grid gap-2 sm:grid-cols-2'>
+                <label className={`rounded-xl border px-3 py-3 text-sm transition ${voiceGender === 'female' ? 'border-leiae-accent bg-leiae-accent/10' : 'border-leiae-dark/10'}`}>
+                  <input
+                    type='radio'
+                    name='robot-voice-gender'
+                    value='female'
+                    checked={voiceGender === 'female'}
+                    onChange={() => setVoiceGender('female')}
+                    className='mr-2 accent-leiae-accent'
+                  />
+                  Feminina
+                </label>
+
+                <label className={`rounded-xl border px-3 py-3 text-sm transition ${voiceGender === 'male' ? 'border-leiae-accent bg-leiae-accent/10' : 'border-leiae-dark/10'}`}>
+                  <input
+                    type='radio'
+                    name='robot-voice-gender'
+                    value='male'
+                    checked={voiceGender === 'male'}
+                    onChange={() => setVoiceGender('male')}
+                    className='mr-2 accent-leiae-accent'
+                  />
+                  Masculina
+                </label>
+              </div>
+              <p className='mt-2 text-xs text-leiae-dark/65'>A escolha usa as vozes disponíveis no navegador com fallback automático.</p>
+            </section>
 
             <section className='rounded-2xl border border-leiae-dark/10 bg-white/75 p-4'>
               <p className='text-sm font-semibold text-leiae-dark'>Velocidade padrão da voz robotizada</p>
@@ -204,6 +237,7 @@ export default function AjustesPage() {
 
             <div className='rounded-2xl border border-leiae-dark/10 bg-white/70 p-4 text-sm text-leiae-dark/80'>
               <p>Modo de voz padrão: <strong>Robotizada</strong></p>
+              <p className='mt-1'>Timbre da voz: <strong>{voiceGender === 'male' ? 'Masculina' : 'Feminina'}</strong></p>
               <p className='mt-1'>Velocidade da voz: <strong>{voiceRate.toFixed(1)}x</strong></p>
               <p className='mt-1'>Leitura guiada: <strong>{guidedSpeed.toFixed(2)}x</strong></p>
             </div>
@@ -215,6 +249,8 @@ export default function AjustesPage() {
     </>
   );
 }
+
+
 
 
 

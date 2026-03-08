@@ -4,11 +4,19 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function normalizeString(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function buildFallbackWords(text) {
   const tokens = text.match(/\S+/g) || [];
   return tokens.map((token, index) => ({
     indice: index,
     texto: token,
+    inicio: index * 0.35,
   }));
 }
 
@@ -22,6 +30,81 @@ function getLocalWordIndexByChar(segmentWords, charIndex) {
   }
 
   return segmentWords.length - 1;
+}
+
+function getWordStartSeconds(word, fallbackIndex) {
+  if (typeof word?.inicio === 'number' && Number.isFinite(word.inicio)) {
+    return word.inicio;
+  }
+
+  return fallbackIndex * 0.35;
+}
+
+function findWordIndexByTimeline(words, timelineSeconds, minIndex = 0) {
+  if (!words.length) return 0;
+
+  const boundedMin = clamp(minIndex, 0, words.length - 1);
+
+  for (let i = boundedMin; i < words.length; i += 1) {
+    const nextStart = i < words.length - 1 ? getWordStartSeconds(words[i + 1], i + 1) : Number.POSITIVE_INFINITY;
+    if (timelineSeconds < nextStart) {
+      return i;
+    }
+  }
+
+  return words.length - 1;
+}
+
+function pickVoiceByGender(voices, voiceGender) {
+  if (!voices.length) return null;
+
+  const normalizedGender = voiceGender === 'male' ? 'male' : 'female';
+  const preferredLocales = voices.filter((voice) => /^pt(-|$)/i.test(voice.lang || ''));
+  const candidates = preferredLocales.length ? preferredLocales : voices;
+
+  const maleKeywords = ['male', 'mascul', 'homem', 'man', 'paulo', 'joao', 'carlos', 'daniel', 'ricardo', 'mateus'];
+  const femaleKeywords = ['female', 'femin', 'mulher', 'woman', 'ana', 'maria', 'sofia', 'beatriz', 'clara', 'helena'];
+  const positiveKeywords = normalizedGender === 'male' ? maleKeywords : femaleKeywords;
+  const negativeKeywords = normalizedGender === 'male' ? femaleKeywords : maleKeywords;
+
+  let bestVoice = candidates[0] || null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  candidates.forEach((voice) => {
+    const normalizedName = normalizeString(voice.name);
+    const normalizedLang = normalizeString(voice.lang);
+
+    let score = 0;
+
+    if (normalizedLang.startsWith('pt-br')) {
+      score += 4;
+    } else if (normalizedLang.startsWith('pt')) {
+      score += 2;
+    }
+
+    if (voice.localService) {
+      score += 0.4;
+    }
+
+    positiveKeywords.forEach((keyword) => {
+      if (normalizedName.includes(keyword)) {
+        score += 2;
+      }
+    });
+
+    negativeKeywords.forEach((keyword) => {
+      if (normalizedName.includes(keyword)) {
+        score -= 2;
+      }
+    });
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestVoice = voice;
+    }
+  });
+
+  return bestVoice;
 }
 
 function PlayIcon() {
@@ -62,6 +145,7 @@ export default function SpeechSynthesisPlayer({
   words,
   activeWordIndex,
   initialRate = 1,
+  voiceGender = 'female',
   onWordBoundary,
   onPlayStateChange,
   onRateChange,
@@ -69,13 +153,19 @@ export default function SpeechSynthesisPlayer({
   externalAction,
   compact = false,
 }) {
-  const utteranceRef = useRef(null);
   const utteranceTokenRef = useRef(0);
   const segmentWordsRef = useRef([]);
   const segmentStartRef = useRef(0);
   const isSeekingRef = useRef(false);
   const pauseAfterStartRef = useRef(false);
   const lastExternalActionRef = useRef(null);
+  const playbackStartMsRef = useRef(0);
+  const playbackBaseSecondsRef = useRef(0);
+  const pausedAtMsRef = useRef(null);
+  const boundarySeenRef = useRef(false);
+  const lastBoundaryAtMsRef = useRef(0);
+  const activeWordIndexRef = useRef(activeWordIndex);
+  const currentWordIndexRef = useRef(0);
 
   const [supported, setSupported] = useState(false);
   const [status, setStatus] = useState('idle');
@@ -84,12 +174,14 @@ export default function SpeechSynthesisPlayer({
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [speechError, setSpeechError] = useState('');
   const [isSeeking, setIsSeeking] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]);
 
   const normalizedWords = useMemo(() => {
     if (Array.isArray(words) && words.length > 0) {
       return words.map((word, index) => ({
         indice: typeof word.indice === 'number' ? word.indice : index,
         texto: word?.texto || '',
+        inicio: typeof word?.inicio === 'number' ? word.inicio : null,
       }));
     }
 
@@ -102,13 +194,21 @@ export default function SpeechSynthesisPlayer({
   const isPlaying = status === 'playing';
   const isPaused = status === 'paused';
 
+  const selectedVoice = useMemo(
+    () => pickVoiceByGender(availableVoices, voiceGender),
+    [availableVoices, voiceGender],
+  );
+
   const emitWord = useCallback(
     (index, options = {}) => {
       const bounded = clamp(index, 0, maxIndex);
+      currentWordIndexRef.current = bounded;
       setCurrentWordIndex(bounded);
+
       if (options.syncSeek) {
         setSeekWordIndex(bounded);
       }
+
       onWordBoundary?.(bounded);
     },
     [maxIndex, onWordBoundary],
@@ -150,8 +250,14 @@ export default function SpeechSynthesisPlayer({
 
       utteranceTokenRef.current += 1;
       window.speechSynthesis.cancel();
-      utteranceRef.current = null;
       segmentWordsRef.current = [];
+      pauseAfterStartRef.current = false;
+      pausedAtMsRef.current = null;
+      playbackStartMsRef.current = 0;
+      playbackBaseSecondsRef.current = 0;
+      boundarySeenRef.current = false;
+      lastBoundaryAtMsRef.current = 0;
+
       setStatus(nextStatus);
       onPlayStateChange?.(false);
     },
@@ -175,10 +281,22 @@ export default function SpeechSynthesisPlayer({
       setSpeechError('');
       emitWord(start);
 
+      playbackStartMsRef.current = Date.now();
+      playbackBaseSecondsRef.current = getWordStartSeconds(normalizedWords[start], start);
+      pausedAtMsRef.current = null;
+      boundarySeenRef.current = false;
+      lastBoundaryAtMsRef.current = 0;
+
       const utterance = new SpeechSynthesisUtterance(speechText);
-      utterance.lang = 'pt-BR';
       utterance.pitch = 1;
       utterance.rate = typeof rateOverride === 'number' ? rateOverride : voiceRate;
+
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        utterance.lang = selectedVoice.lang || 'pt-BR';
+      } else {
+        utterance.lang = 'pt-BR';
+      }
 
       utterance.onstart = () => {
         if (token !== utteranceTokenRef.current) return;
@@ -199,19 +317,33 @@ export default function SpeechSynthesisPlayer({
         if (token !== utteranceTokenRef.current) return;
         if (isSeekingRef.current || typeof event.charIndex !== 'number') return;
 
+        boundarySeenRef.current = true;
+        lastBoundaryAtMsRef.current = Date.now();
+
         const localWordIndex = getLocalWordIndexByChar(segmentWordsRef.current, event.charIndex);
         const globalWordIndex = clamp(segmentStartRef.current + localWordIndex, 0, maxIndex);
+
+        playbackBaseSecondsRef.current = getWordStartSeconds(normalizedWords[globalWordIndex], globalWordIndex);
+        playbackStartMsRef.current = Date.now();
+
         emitWord(globalWordIndex, { syncSeek: true });
       };
 
       utterance.onpause = () => {
         if (token !== utteranceTokenRef.current) return;
+        pausedAtMsRef.current = Date.now();
         setStatus('paused');
         onPlayStateChange?.(false);
       };
 
       utterance.onresume = () => {
         if (token !== utteranceTokenRef.current) return;
+
+        if (pausedAtMsRef.current) {
+          playbackStartMsRef.current += Date.now() - pausedAtMsRef.current;
+          pausedAtMsRef.current = null;
+        }
+
         setStatus('playing');
         onPlayStateChange?.(true);
       };
@@ -230,10 +362,9 @@ export default function SpeechSynthesisPlayer({
         onPlayStateChange?.(false);
       };
 
-      utteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     },
-    [buildSpeechSegment, canUse, emitWord, maxIndex, onPlayStateChange, voiceRate],
+    [buildSpeechSegment, canUse, emitWord, maxIndex, normalizedWords, onPlayStateChange, selectedVoice, voiceRate],
   );
 
   useEffect(() => {
@@ -250,6 +381,32 @@ export default function SpeechSynthesisPlayer({
   }, [supported]);
 
   useEffect(() => {
+    if (!supported) return undefined;
+
+    const updateVoices = () => {
+      const voices = window.speechSynthesis.getVoices() || [];
+      setAvailableVoices(voices);
+    };
+
+    updateVoices();
+
+    const speechSynthesis = window.speechSynthesis;
+    if (typeof speechSynthesis.addEventListener === 'function') {
+      speechSynthesis.addEventListener('voiceschanged', updateVoices);
+      return () => speechSynthesis.removeEventListener('voiceschanged', updateVoices);
+    }
+
+    speechSynthesis.onvoiceschanged = updateVoices;
+    return () => {
+      speechSynthesis.onvoiceschanged = null;
+    };
+  }, [supported]);
+
+  useEffect(() => {
+    activeWordIndexRef.current = activeWordIndex;
+  }, [activeWordIndex]);
+
+  useEffect(() => {
     const nextRate = clamp(Number(initialRate) || 1, 0.6, 2);
     setVoiceRate(nextRate);
   }, [initialRate]);
@@ -257,11 +414,14 @@ export default function SpeechSynthesisPlayer({
   useEffect(() => {
     if (!supported) return;
 
-    const initialIndex = typeof activeWordIndex === 'number' ? clamp(activeWordIndex, 0, maxIndex) : 0;
+    const initialIndex = typeof activeWordIndexRef.current === 'number'
+      ? clamp(activeWordIndexRef.current, 0, maxIndex)
+      : 0;
 
     stopSpeech('idle');
     setSpeechError('');
     setSeekWordIndex(initialIndex);
+    currentWordIndexRef.current = initialIndex;
     setCurrentWordIndex(initialIndex);
     onWordBoundary?.(initialIndex);
   }, [maxIndex, onWordBoundary, stopSpeech, supported, text]);
@@ -271,12 +431,41 @@ export default function SpeechSynthesisPlayer({
     if (isSeekingRef.current) return;
 
     const bounded = clamp(activeWordIndex, 0, maxIndex);
+    currentWordIndexRef.current = bounded;
     setCurrentWordIndex(bounded);
 
     if (!isPlaying) {
       setSeekWordIndex(bounded);
     }
   }, [activeWordIndex, isPlaying, maxIndex]);
+
+  useEffect(() => {
+    if (!isPlaying || !canUse || totalWords < 2) return undefined;
+
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+
+      if (boundarySeenRef.current && now - lastBoundaryAtMsRef.current < 900) {
+        return;
+      }
+
+      if (!playbackStartMsRef.current) {
+        return;
+      }
+
+      const elapsedSeconds = (now - playbackStartMsRef.current) / 1000;
+      const timelineSeconds = playbackBaseSecondsRef.current + elapsedSeconds * voiceRate;
+      const nextIndex = findWordIndexByTimeline(normalizedWords, timelineSeconds, segmentStartRef.current);
+
+      if (nextIndex !== currentWordIndexRef.current) {
+        emitWord(nextIndex, { syncSeek: true });
+      }
+    }, 120);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [canUse, emitWord, isPlaying, normalizedWords, totalWords, voiceRate]);
 
   const handlePlay = useCallback(() => {
     if (!supported || !canUse) return;
@@ -308,7 +497,13 @@ export default function SpeechSynthesisPlayer({
           }
         });
       }
+      return;
     }
+
+    // Se o áudio ainda está iniciando, pausar assim que começar.
+    pauseAfterStartRef.current = true;
+    setStatus('paused');
+    onPlayStateChange?.(false);
   }, [canUse, onPlayStateChange, supported]);
 
   const restartFromIndex = useCallback(
@@ -319,16 +514,18 @@ export default function SpeechSynthesisPlayer({
 
       if (keepPaused) {
         pauseAfterStartRef.current = true;
+        setStatus('paused');
+        onPlayStateChange?.(false);
       }
 
       speakFrom(nextIndex, rateOverride);
     },
-    [maxIndex, speakFrom],
+    [maxIndex, onPlayStateChange, speakFrom],
   );
 
   const handleJump = useCallback(
     (step) => {
-      const nextIndex = clamp(currentWordIndex + step, 0, maxIndex);
+      const nextIndex = clamp(currentWordIndexRef.current + step, 0, maxIndex);
       setSeekWordIndex(nextIndex);
       emitWord(nextIndex);
 
@@ -341,7 +538,7 @@ export default function SpeechSynthesisPlayer({
         restartFromIndex(nextIndex, { keepPaused: true });
       }
     },
-    [currentWordIndex, emitWord, isPaused, isPlaying, maxIndex, restartFromIndex],
+    [emitWord, isPaused, isPlaying, maxIndex, restartFromIndex],
   );
 
   const handleSeekToIndex = useCallback(
@@ -401,9 +598,10 @@ export default function SpeechSynthesisPlayer({
       isPaused,
       currentWordIndex,
       totalWords,
+      selectedVoiceName: selectedVoice?.name || '',
       progressPercent: totalWords > 1 ? (currentWordIndex / (totalWords - 1)) * 100 : 0,
     });
-  }, [canUse, currentWordIndex, isPaused, isPlaying, onStatusChange, supported, totalWords]);
+  }, [canUse, currentWordIndex, isPaused, isPlaying, onStatusChange, selectedVoice, supported, totalWords]);
 
   const handleRate = (delta) => {
     setVoiceRate((previous) => {
@@ -413,9 +611,9 @@ export default function SpeechSynthesisPlayer({
         onRateChange?.(next);
 
         if (isPlaying) {
-          restartFromIndex(currentWordIndex, { rateOverride: next });
+          restartFromIndex(currentWordIndexRef.current, { rateOverride: next });
         } else if (isPaused) {
-          restartFromIndex(currentWordIndex, { keepPaused: true, rateOverride: next });
+          restartFromIndex(currentWordIndexRef.current, { keepPaused: true, rateOverride: next });
         }
       }
 
@@ -582,8 +780,4 @@ export default function SpeechSynthesisPlayer({
     </section>
   );
 }
-
-
-
-
 

@@ -139,6 +139,7 @@ export default function LeituraPage() {
   const [focusMode, setFocusMode] = useState(defaultReadingPreferences.focusMode);
   const [voiceMode, setVoiceMode] = useState(defaultReadingPreferences.voiceMode);
   const [voiceRate, setVoiceRate] = useState(defaultReadingPreferences.voiceRate);
+  const [voiceGender, setVoiceGender] = useState(defaultReadingPreferences.voiceGender);
 
   const [controlsCollapsed, setControlsCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -202,6 +203,7 @@ export default function LeituraPage() {
     setFocusMode(preferences.focusMode);
     setVoiceMode(preferences.voiceMode);
     setVoiceRate(preferences.voiceRate);
+    setVoiceGender(preferences.voiceGender);
     setGuidedSpeed(preferences.guidedSpeed);
     setPreferencesLoaded(true);
   }, []);
@@ -215,9 +217,10 @@ export default function LeituraPage() {
       focusMode,
       voiceMode,
       voiceRate,
+      voiceGender,
       guidedSpeed,
     });
-  }, [preferencesLoaded, fontScale, highContrast, focusMode, voiceMode, voiceRate, guidedSpeed]);
+  }, [preferencesLoaded, fontScale, highContrast, focusMode, voiceMode, voiceRate, voiceGender, guidedSpeed]);
 
   useEffect(() => {
     if (!story || !router.isReady) return;
@@ -601,6 +604,7 @@ export default function LeituraPage() {
                     words={story.palavras}
                     activeWordIndex={guidedWordIndex}
                     initialRate={voiceRate}
+                    voiceGender={voiceGender}
                     onWordBoundary={setGuidedWordIndex}
                     onRateChange={setVoiceRate}
                     onStatusChange={setSpeechStatus}
@@ -629,6 +633,7 @@ export default function LeituraPage() {
     </>
   );
 }
+
 
 
 

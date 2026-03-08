@@ -5,6 +5,7 @@ export const defaultReadingPreferences = {
   highContrast: false,
   focusMode: false,
   voiceMode: 'robotic',
+  voiceGender: 'female',
   voiceRate: 1,
   guidedSpeed: 1,
 };
@@ -23,6 +24,7 @@ export function normalizeReadingPreferences(preferences = {}) {
     highContrast: Boolean(preferences.highContrast),
     focusMode: Boolean(preferences.focusMode),
     voiceMode: 'robotic',
+    voiceGender: preferences.voiceGender === 'male' ? 'male' : 'female',
     voiceRate: Number.isFinite(voiceRate) ? Number(clamp(voiceRate, 0.6, 2).toFixed(1)) : defaultReadingPreferences.voiceRate,
     guidedSpeed: Number.isFinite(guidedSpeed) ? Number(clamp(guidedSpeed, 0.5, 3).toFixed(2)) : defaultReadingPreferences.guidedSpeed,
   };
@@ -54,4 +56,3 @@ export function saveReadingPreferences(preferences) {
     // Ignora falha de armazenamento local.
   }
 }
-
