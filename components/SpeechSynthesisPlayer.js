@@ -65,6 +65,8 @@ export default function SpeechSynthesisPlayer({
   onWordBoundary,
   onPlayStateChange,
   onRateChange,
+  onStatusChange,
+  externalAction,
   compact = false,
 }) {
   const utteranceRef = useRef(null);
@@ -72,6 +74,7 @@ export default function SpeechSynthesisPlayer({
   const segmentWordsRef = useRef([]);
   const segmentStartRef = useRef(0);
   const isSeekingRef = useRef(false);
+  const lastExternalActionRef = useRef(null);
 
   const [supported, setSupported] = useState(false);
   const [status, setStatus] = useState('idle');
@@ -266,7 +269,7 @@ export default function SpeechSynthesisPlayer({
     }
   }, [activeWordIndex, isPlaying, maxIndex]);
 
-  const handlePlay = () => {
+  const handlePlay = useCallback(() => {
     if (!supported || !canUse) return;
 
     if (window.speechSynthesis.paused) {
@@ -275,25 +278,84 @@ export default function SpeechSynthesisPlayer({
     }
 
     speakFrom(seekWordIndex);
-  };
+  }, [canUse, seekWordIndex, speakFrom, supported]);
 
-  const handlePause = () => {
+  const handlePause = useCallback(() => {
     if (!supported || !canUse) return;
 
     if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
       window.speechSynthesis.pause();
     }
-  };
+  }, [canUse, supported]);
 
-  const handleJump = (step) => {
-    const nextIndex = clamp(currentWordIndex + step, 0, maxIndex);
-    setSeekWordIndex(nextIndex);
-    emitWord(nextIndex);
+  const handleJump = useCallback(
+    (step) => {
+      const nextIndex = clamp(currentWordIndex + step, 0, maxIndex);
+      setSeekWordIndex(nextIndex);
+      emitWord(nextIndex);
 
-    if (isPlaying || isPaused) {
-      speakFrom(nextIndex);
+      if (isPlaying || isPaused) {
+        speakFrom(nextIndex);
+      }
+    },
+    [currentWordIndex, emitWord, isPaused, isPlaying, maxIndex, speakFrom],
+  );
+
+  const handleSeekToIndex = useCallback(
+    (index) => {
+      const nextIndex = clamp(index, 0, maxIndex);
+      setSeekWordIndex(nextIndex);
+      emitWord(nextIndex);
+
+      if (isPlaying || isPaused) {
+        speakFrom(nextIndex);
+      }
+    },
+    [emitWord, isPaused, isPlaying, maxIndex, speakFrom],
+  );
+
+  useEffect(() => {
+    if (!externalAction?.id) return;
+    if (externalAction.id === lastExternalActionRef.current) return;
+
+    lastExternalActionRef.current = externalAction.id;
+
+    if (externalAction.type === 'toggle-play') {
+      if (isPlaying) {
+        handlePause();
+      } else {
+        handlePlay();
+      }
+      return;
     }
-  };
+
+    if (externalAction.type === 'jump') {
+      const step = Number(externalAction.step) || 0;
+      if (step !== 0) {
+        handleJump(step);
+      }
+      return;
+    }
+
+    if (externalAction.type === 'seek') {
+      const index = Number(externalAction.index);
+      if (Number.isFinite(index)) {
+        handleSeekToIndex(index);
+      }
+    }
+  }, [externalAction, handleJump, handlePause, handlePlay, handleSeekToIndex, isPlaying]);
+
+  useEffect(() => {
+    onStatusChange?.({
+      supported,
+      canUse,
+      isPlaying,
+      isPaused,
+      currentWordIndex,
+      totalWords,
+      progressPercent: totalWords > 1 ? (currentWordIndex / (totalWords - 1)) * 100 : 0,
+    });
+  }, [canUse, currentWordIndex, isPaused, isPlaying, onStatusChange, supported, totalWords]);
 
   const handleRate = (delta) => {
     setVoiceRate((previous) => {

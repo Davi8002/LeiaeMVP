@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import AppShell from '../../components/AppShell';
 import AccessibilityControls from '../../components/AccessibilityControls';
-import AudioPlayer from '../../components/AudioPlayer';
 import GuidedReadingControls from '../../components/GuidedReadingControls';
 import GuidedReadingText from '../../components/GuidedReadingText';
 import SpeechSynthesisPlayer from '../../components/SpeechSynthesisPlayer';
@@ -46,29 +45,23 @@ function FullscreenIcon({ active }) {
   );
 }
 
-function getWordIndexByTime(words, time) {
-  if (!words?.length) return 0;
-
-  const foundIndex = words.findIndex((word, index) => {
-    const nextStart = words[index + 1]?.inicio;
-    if (typeof nextStart === 'number') {
-      return time >= word.inicio && time < nextStart;
-    }
-
-    return time >= word.inicio && time <= word.fim + 0.35;
-  });
-
-  if (foundIndex === -1) {
-    return words.length - 1;
-  }
-
-  return foundIndex;
+function ArrowIcon({ direction = 'left' }) {
+  return (
+    <svg viewBox='0 0 24 24' className='h-4 w-4' fill='none' stroke='currentColor' strokeWidth='2'>
+      {direction === 'left' ? (
+        <path d='M14 6l-6 6 6 6' strokeLinecap='round' strokeLinejoin='round' />
+      ) : (
+        <path d='M10 6l6 6-6 6' strokeLinecap='round' strokeLinejoin='round' />
+      )}
+    </svg>
+  );
 }
 
 export default function LeituraPage() {
   const router = useRouter();
   const { id } = router.query;
   const readingSurfaceRef = useRef(null);
+  const speechActionIdRef = useRef(0);
 
   const story = useMemo(() => (typeof id === 'string' ? getStoryById(id) : null), [id]);
 
@@ -86,11 +79,17 @@ export default function LeituraPage() {
   const [guidedSpeed, setGuidedSpeed] = useState(defaultReadingPreferences.guidedSpeed);
   const [guidedWordIndex, setGuidedWordIndex] = useState(0);
 
-  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
-  const [audioPlaying, setAudioPlaying] = useState(false);
-
   const [speechPlaying, setSpeechPlaying] = useState(false);
+  const [speechAction, setSpeechAction] = useState(null);
+  const [speechStatus, setSpeechStatus] = useState({
+    supported: true,
+    canUse: false,
+    isPlaying: false,
+    isPaused: false,
+    currentWordIndex: 0,
+    totalWords: 0,
+    progressPercent: 0,
+  });
 
   const totalWords = story?.palavras?.length ?? 1;
   const pageTitle = story ? `${story.titulo} | LeiaÊ` : 'Leitura | LeiaÊ';
@@ -98,7 +97,6 @@ export default function LeituraPage() {
   const roboticVoiceActive = voiceMode === 'robotic';
   const showSidePanel = !controlsCollapsed;
 
-  const audioSyncActive = audioPlaying && audioDuration > 0 && (story?.palavras?.length ?? 0) > 0;
   const speechSyncActive = roboticVoiceActive && speechPlaying && (story?.palavras?.length ?? 0) > 0;
 
   const canIncreaseSpeed = guidedSpeed < 3;
@@ -106,9 +104,48 @@ export default function LeituraPage() {
 
   const syncLabel = speechSyncActive
     ? 'Sincronizado com voz robotizada'
-    : audioSyncActive
-      ? 'Sincronizado com áudio'
-      : 'Modo visual independente';
+    : 'Modo visual independente';
+
+  const pageRanges = useMemo(() => {
+    if (!story?.palavras?.length) return [{ start: 0, end: 0 }];
+
+    const grouped = story.paragrafos.map(() => ({ start: null, end: null }));
+
+    story.palavras.forEach((word) => {
+      const range = grouped[word.paragrafoIndex];
+      if (!range) return;
+
+      if (range.start === null) {
+        range.start = word.indice;
+      }
+
+      range.end = word.indice;
+    });
+
+    return grouped
+      .map((range) => ({
+        start: typeof range.start === 'number' ? range.start : 0,
+        end: typeof range.end === 'number' ? range.end : 0,
+      }))
+      .filter((range, index, list) => list.length === 1 || range.end >= range.start);
+  }, [story]);
+
+  const currentPageIndex = useMemo(() => {
+    if (!pageRanges.length) return 0;
+
+    const index = pageRanges.findIndex((range) => guidedWordIndex >= range.start && guidedWordIndex <= range.end);
+    if (index === -1) return pageRanges.length - 1;
+    return index;
+  }, [guidedWordIndex, pageRanges]);
+
+  const dispatchSpeechAction = useCallback((type, payload = {}) => {
+    speechActionIdRef.current += 1;
+    setSpeechAction({
+      id: speechActionIdRef.current,
+      type,
+      ...payload,
+    });
+  }, []);
 
   useEffect(() => {
     const preferences = loadReadingPreferences();
@@ -155,9 +192,6 @@ export default function LeituraPage() {
     setControlsCollapsed(false);
     setGuidedPlaying(false);
     setGuidedWordIndex(Math.min(initialWordIndex, maxWordIndex));
-    setAudioCurrentTime(0);
-    setAudioDuration(0);
-    setAudioPlaying(false);
     setSpeechPlaying(false);
   }, [story, router.isReady, router.query.w]);
 
@@ -175,15 +209,9 @@ export default function LeituraPage() {
   }, [guidedWordIndex, story]);
 
   useEffect(() => {
-    if (!roboticVoiceActive) {
-      setSpeechPlaying(false);
-    }
+    if (roboticVoiceActive) return;
+    setSpeechPlaying(false);
   }, [roboticVoiceActive]);
-
-  useEffect(() => {
-    if (showSidePanel) return;
-    setAudioPlaying(false);
-  }, [showSidePanel]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -213,23 +241,8 @@ export default function LeituraPage() {
     }
   };
 
-  const syncFromAudio = useCallback(
-    (time) => {
-      if (!story?.palavras?.length) return;
-      const nextIndex = getWordIndexByTime(story.palavras, time);
-      setGuidedWordIndex(nextIndex);
-    },
-    [story],
-  );
-
   useEffect(() => {
-    if (!audioSyncActive || speechSyncActive) return;
-
-    syncFromAudio(audioCurrentTime);
-  }, [audioCurrentTime, audioSyncActive, speechSyncActive, syncFromAudio]);
-
-  useEffect(() => {
-    if (!guidedPlaying || audioSyncActive || speechSyncActive || totalWords <= 1) return undefined;
+    if (!guidedPlaying || speechSyncActive || totalWords <= 1) return undefined;
 
     const intervalMs = Math.max(110, Math.round(450 / guidedSpeed));
 
@@ -244,15 +257,15 @@ export default function LeituraPage() {
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [audioSyncActive, guidedPlaying, guidedSpeed, speechSyncActive, totalWords]);
+  }, [guidedPlaying, guidedSpeed, speechSyncActive, totalWords]);
 
   useEffect(() => {
-    if (!guidedPlaying || audioSyncActive || speechSyncActive) return;
+    if (!guidedPlaying || speechSyncActive) return;
 
     if (guidedWordIndex >= totalWords - 1) {
       setGuidedPlaying(false);
     }
-  }, [audioSyncActive, guidedPlaying, guidedWordIndex, speechSyncActive, totalWords]);
+  }, [guidedPlaying, guidedWordIndex, speechSyncActive, totalWords]);
 
   const toggleGuided = () => {
     if (guidedPlaying) {
@@ -273,6 +286,31 @@ export default function LeituraPage() {
 
   const decreaseSpeed = () => {
     setGuidedSpeed((previous) => Number(Math.max(0.5, previous - 0.25).toFixed(2)));
+  };
+
+  const quickDisabled = !roboticVoiceActive || !speechStatus.canUse;
+
+  const handleQuickJump = (step) => {
+    if (quickDisabled) return;
+    dispatchSpeechAction('jump', { step });
+  };
+
+  const handleQuickToggle = () => {
+    if (quickDisabled) return;
+    dispatchSpeechAction('toggle-play');
+  };
+
+  const navigatePage = (delta) => {
+    if (!pageRanges.length) return;
+
+    const nextPage = Math.max(0, Math.min(pageRanges.length - 1, currentPageIndex + delta));
+    const targetIndex = pageRanges[nextPage].start;
+
+    setGuidedWordIndex(targetIndex);
+
+    if (roboticVoiceActive) {
+      dispatchSpeechAction('seek', { index: targetIndex });
+    }
   };
 
   if (!router.isReady) {
@@ -361,18 +399,42 @@ export default function LeituraPage() {
                   activeWordIndex={guidedWordIndex}
                   totalWords={totalWords}
                 />
-
-                <AudioPlayer
-                  src={story.audio}
-                  title={story.titulo}
-                  onTimeUpdate={setAudioCurrentTime}
-                  onPlayStateChange={setAudioPlaying}
-                  onDurationChange={setAudioDuration}
-                />
               </aside>
             ) : null}
 
             <article className={`rounded-2xl border p-5 transition sm:p-6 ${readingCardTone} ${focusMode ? 'ring-2 ring-leiae-accent/25' : ''}`}>
+              <div className='sticky top-2 z-20 mb-4 flex justify-end'>
+                <div className='rounded-full border border-leiae-dark/10 bg-leiae-paper/95 px-2 py-1 shadow-sm backdrop-blur'>
+                  <div className='flex flex-wrap items-center gap-1 text-[11px] font-semibold text-leiae-dark sm:text-xs'>
+                    <span className='rounded-full bg-leiae-accent/10 px-2 py-1'>Leitura</span>
+                    <button
+                      type='button'
+                      onClick={() => handleQuickJump(-3)}
+                      disabled={quickDisabled}
+                      className='rounded-full border border-leiae-dark/20 bg-white px-2 py-1 transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+                    >
+                      Voltar 3
+                    </button>
+                    <button
+                      type='button'
+                      onClick={handleQuickToggle}
+                      disabled={quickDisabled}
+                      className='rounded-full bg-leiae-accent px-2 py-1 text-leiae-bg transition hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-45'
+                    >
+                      {speechStatus.isPlaying ? 'Pausar' : 'Retomar'}
+                    </button>
+                    <button
+                      type='button'
+                      onClick={() => handleQuickJump(3)}
+                      disabled={quickDisabled}
+                      className='rounded-full border border-leiae-dark/20 bg-white px-2 py-1 transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+                    >
+                      Avançar 3
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className='mb-4 flex flex-wrap items-center justify-between gap-2'>
                 <h2 className={`font-display text-2xl ${highContrast ? 'text-leiae-bg' : 'text-leiae-dark'}`}>Leitura</h2>
                 <span className='rounded-full border border-leiae-dark/15 bg-leiae-paper/70 px-3 py-1 text-xs font-semibold text-leiae-dark/70'>
@@ -386,6 +448,34 @@ export default function LeituraPage() {
                 fontScale={fontScale}
                 highContrast={highContrast}
               />
+
+              <div className='mt-8 border-t border-leiae-dark/10 pt-4'>
+                <div className='flex items-center justify-center gap-3'>
+                  <button
+                    type='button'
+                    onClick={() => navigatePage(-1)}
+                    disabled={currentPageIndex <= 0}
+                    className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+                    aria-label='Página anterior'
+                  >
+                    <ArrowIcon direction='left' />
+                  </button>
+
+                  <span className='rounded-full bg-leiae-dark/10 px-3 py-1 text-xs font-semibold text-leiae-dark/75'>
+                    Página {currentPageIndex + 1}/{pageRanges.length}
+                  </span>
+
+                  <button
+                    type='button'
+                    onClick={() => navigatePage(1)}
+                    disabled={currentPageIndex >= pageRanges.length - 1}
+                    className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+                    aria-label='Próxima página'
+                  >
+                    <ArrowIcon direction='right' />
+                  </button>
+                </div>
+              </div>
             </article>
           </div>
 
@@ -448,6 +538,8 @@ export default function LeituraPage() {
                     onWordBoundary={setGuidedWordIndex}
                     onPlayStateChange={setSpeechPlaying}
                     onRateChange={setVoiceRate}
+                    onStatusChange={setSpeechStatus}
+                    externalAction={speechAction}
                     compact
                   />
                 ) : (
