@@ -1,0 +1,11 @@
+<svg width="600" height="220" viewBox="0 0 600 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="600" height="220" rx="26" fill="#F7EDE1"/>
+  <g transform="translate(36 30)">
+    <circle cx="80" cy="80" r="74" fill="#FFF8EF" stroke="#452A15" stroke-width="10"/>
+    <circle cx="70" cy="64" r="18" stroke="#452A15" stroke-width="8" fill="none"/>
+    <path d="M45 109C59 126 100 126 116 109" stroke="#452A15" stroke-width="9" stroke-linecap="round"/>
+    <path d="M130 81L160 72L137 96" fill="#D94F2E" stroke="#452A15" stroke-width="8" stroke-linejoin="round"/>
+  </g>
+  <text x="220" y="136" fill="#452A15" font-size="88" font-family="Georgia, serif" font-weight="700">Leia�</text>
+</svg>
+
