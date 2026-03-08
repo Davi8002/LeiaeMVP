@@ -74,6 +74,7 @@ export default function SpeechSynthesisPlayer({
   const segmentWordsRef = useRef([]);
   const segmentStartRef = useRef(0);
   const isSeekingRef = useRef(false);
+  const pauseAfterStartRef = useRef(false);
   const lastExternalActionRef = useRef(null);
 
   const [supported, setSupported] = useState(false);
@@ -181,6 +182,15 @@ export default function SpeechSynthesisPlayer({
 
       utterance.onstart = () => {
         if (token !== utteranceTokenRef.current) return;
+
+        if (pauseAfterStartRef.current) {
+          pauseAfterStartRef.current = false;
+          setStatus('paused');
+          onPlayStateChange?.(false);
+          window.speechSynthesis.pause();
+          return;
+        }
+
         setStatus('playing');
         onPlayStateChange?.(true);
       };
@@ -247,15 +257,14 @@ export default function SpeechSynthesisPlayer({
   useEffect(() => {
     if (!supported) return;
 
-    const nextRate = clamp(Number(initialRate) || 1, 0.6, 2);
+    const initialIndex = typeof activeWordIndex === 'number' ? clamp(activeWordIndex, 0, maxIndex) : 0;
 
     stopSpeech('idle');
-    setVoiceRate(nextRate);
     setSpeechError('');
-    setSeekWordIndex(0);
-    setCurrentWordIndex(0);
-    onWordBoundary?.(0);
-  }, [initialRate, onWordBoundary, stopSpeech, supported, text]);
+    setSeekWordIndex(initialIndex);
+    setCurrentWordIndex(initialIndex);
+    onWordBoundary?.(initialIndex);
+  }, [maxIndex, onWordBoundary, stopSpeech, supported, text]);
 
   useEffect(() => {
     if (typeof activeWordIndex !== 'number') return;
@@ -288,17 +297,37 @@ export default function SpeechSynthesisPlayer({
     }
   }, [canUse, supported]);
 
+  const restartFromIndex = useCallback(
+    (index, options = {}) => {
+      const nextIndex = clamp(index, 0, maxIndex);
+      const keepPaused = Boolean(options.keepPaused);
+      const rateOverride = options.rateOverride;
+
+      if (keepPaused) {
+        pauseAfterStartRef.current = true;
+      }
+
+      speakFrom(nextIndex, rateOverride);
+    },
+    [maxIndex, speakFrom],
+  );
+
   const handleJump = useCallback(
     (step) => {
       const nextIndex = clamp(currentWordIndex + step, 0, maxIndex);
       setSeekWordIndex(nextIndex);
       emitWord(nextIndex);
 
-      if (isPlaying || isPaused) {
-        speakFrom(nextIndex);
+      if (isPlaying) {
+        restartFromIndex(nextIndex);
+        return;
+      }
+
+      if (isPaused) {
+        restartFromIndex(nextIndex, { keepPaused: true });
       }
     },
-    [currentWordIndex, emitWord, isPaused, isPlaying, maxIndex, speakFrom],
+    [currentWordIndex, emitWord, isPaused, isPlaying, maxIndex, restartFromIndex],
   );
 
   const handleSeekToIndex = useCallback(
@@ -307,11 +336,16 @@ export default function SpeechSynthesisPlayer({
       setSeekWordIndex(nextIndex);
       emitWord(nextIndex);
 
-      if (isPlaying || isPaused) {
-        speakFrom(nextIndex);
+      if (isPlaying) {
+        restartFromIndex(nextIndex);
+        return;
+      }
+
+      if (isPaused) {
+        restartFromIndex(nextIndex, { keepPaused: true });
       }
     },
-    [emitWord, isPaused, isPlaying, maxIndex, speakFrom],
+    [emitWord, isPaused, isPlaying, maxIndex, restartFromIndex],
   );
 
   useEffect(() => {
@@ -364,8 +398,10 @@ export default function SpeechSynthesisPlayer({
       if (next !== previous) {
         onRateChange?.(next);
 
-        if (isPlaying || isPaused) {
-          speakFrom(currentWordIndex, next);
+        if (isPlaying) {
+          restartFromIndex(currentWordIndex, { rateOverride: next });
+        } else if (isPaused) {
+          restartFromIndex(currentWordIndex, { keepPaused: true, rateOverride: next });
         }
       }
 
@@ -390,8 +426,13 @@ export default function SpeechSynthesisPlayer({
     isSeekingRef.current = false;
     setIsSeeking(false);
 
-    if (isPlaying || isPaused) {
-      speakFrom(seekWordIndex);
+    if (isPlaying) {
+      restartFromIndex(seekWordIndex);
+      return;
+    }
+
+    if (isPaused) {
+      restartFromIndex(seekWordIndex, { keepPaused: true });
       return;
     }
 
@@ -527,3 +568,6 @@ export default function SpeechSynthesisPlayer({
     </section>
   );
 }
+
+
+

@@ -1,6 +1,8 @@
-﻿import { useMemo } from 'react';
+﻿import { useEffect, useMemo, useRef } from 'react';
 
 export default function GuidedReadingText({ story, activeWordIndex, fontScale, highContrast, visibleRange }) {
+  const activeWordRef = useRef(null);
+
   const wordsByParagraph = useMemo(() => {
     const start = typeof visibleRange?.start === 'number' ? visibleRange.start : null;
     const end = typeof visibleRange?.end === 'number' ? visibleRange.end : null;
@@ -37,6 +39,18 @@ export default function GuidedReadingText({ story, activeWordIndex, fontScale, h
     return grouped.filter((palavras) => palavras.length > 0);
   }, [story, visibleRange]);
 
+  useEffect(() => {
+    const activeNode = activeWordRef.current;
+    if (!activeNode || typeof window === 'undefined') return;
+
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    activeNode.scrollIntoView({
+      block: isMobile ? 'center' : 'nearest',
+      inline: 'nearest',
+      behavior: 'auto',
+    });
+  }, [activeWordIndex, visibleRange?.start, visibleRange?.end]);
+
   const activeWordClass = highContrast ? 'bg-leiae-accent text-leiae-bg' : 'bg-leiae-accent text-leiae-bg';
 
   return (
@@ -49,7 +63,8 @@ export default function GuidedReadingText({ story, activeWordIndex, fontScale, h
             return (
               <span key={`${story.id}-word-${palavra.indice}-${wordPosition}`}>
                 <span
-                  className={`inline-block rounded-md px-[0.22em] py-[0.06em] leading-[1.45] transition-colors duration-150 ${
+                  ref={isActive ? activeWordRef : null}
+                  className={`inline-block scroll-mt-24 rounded-md px-[0.22em] py-[0.06em] leading-[1.45] transition-colors duration-150 ${
                     isActive ? activeWordClass : 'bg-transparent text-inherit'
                   }`}
                 >
@@ -64,3 +79,4 @@ export default function GuidedReadingText({ story, activeWordIndex, fontScale, h
     </div>
   );
 }
+

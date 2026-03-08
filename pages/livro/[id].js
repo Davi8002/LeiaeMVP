@@ -147,7 +147,6 @@ export default function LeituraPage() {
   const [guidedSpeed, setGuidedSpeed] = useState(defaultReadingPreferences.guidedSpeed);
   const [guidedWordIndex, setGuidedWordIndex] = useState(0);
 
-  const [speechPlaying, setSpeechPlaying] = useState(false);
   const [speechAction, setSpeechAction] = useState(null);
   const [speechStatus, setSpeechStatus] = useState({
     supported: true,
@@ -165,7 +164,7 @@ export default function LeituraPage() {
   const roboticVoiceActive = voiceMode === 'robotic';
   const showSidePanel = !controlsCollapsed;
 
-  const speechSyncActive = roboticVoiceActive && speechPlaying && (story?.palavras?.length ?? 0) > 0;
+  const speechSyncActive = roboticVoiceActive && (speechStatus.isPlaying || speechStatus.isPaused) && (story?.palavras?.length ?? 0) > 0;
 
   const canIncreaseSpeed = guidedSpeed < 3;
   const canDecreaseSpeed = guidedSpeed > 0.5;
@@ -240,7 +239,6 @@ export default function LeituraPage() {
     setControlsCollapsed(false);
     setGuidedPlaying(false);
     setGuidedWordIndex(Math.min(initialWordIndex, maxWordIndex));
-    setSpeechPlaying(false);
   }, [story, router.isReady, router.query.w]);
 
   useEffect(() => {
@@ -255,10 +253,21 @@ export default function LeituraPage() {
 
     return () => clearTimeout(timer);
   }, [guidedWordIndex, story]);
-
   useEffect(() => {
     if (roboticVoiceActive) return;
-    setSpeechPlaying(false);
+
+    setSpeechStatus((previous) => {
+      if (!previous.isPlaying && !previous.isPaused) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        isPlaying: false,
+        isPaused: false,
+        progressPercent: 0,
+      };
+    });
   }, [roboticVoiceActive]);
 
   useEffect(() => {
@@ -591,7 +600,6 @@ export default function LeituraPage() {
                     activeWordIndex={guidedWordIndex}
                     initialRate={voiceRate}
                     onWordBoundary={setGuidedWordIndex}
-                    onPlayStateChange={setSpeechPlaying}
                     onRateChange={setVoiceRate}
                     onStatusChange={setSpeechStatus}
                     externalAction={speechAction}
@@ -619,5 +627,9 @@ export default function LeituraPage() {
     </>
   );
 }
+
+
+
+
 
 
