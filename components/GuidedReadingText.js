@@ -1,6 +1,13 @@
-﻿import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
-export default function GuidedReadingText({ story, activeWordIndex, fontScale, highContrast, visibleRange }) {
+export default function GuidedReadingText({
+  story,
+  activeWordIndex,
+  fontScale,
+  highContrast,
+  visibleRange,
+  centerOnWordToken = 0,
+}) {
   const activeWordRef = useRef(null);
 
   const wordsByParagraph = useMemo(() => {
@@ -40,6 +47,8 @@ export default function GuidedReadingText({ story, activeWordIndex, fontScale, h
   }, [story, visibleRange]);
 
   useEffect(() => {
+    if (!centerOnWordToken) return;
+
     const activeNode = activeWordRef.current;
     if (!activeNode || typeof window === 'undefined') return;
 
@@ -47,9 +56,9 @@ export default function GuidedReadingText({ story, activeWordIndex, fontScale, h
     activeNode.scrollIntoView({
       block: isMobile ? 'center' : 'nearest',
       inline: 'nearest',
-      behavior: 'auto',
+      behavior: 'smooth',
     });
-  }, [activeWordIndex, visibleRange?.start, visibleRange?.end]);
+  }, [centerOnWordToken]);
 
   const activeWordClass = highContrast ? 'bg-leiae-accent text-leiae-bg' : 'bg-leiae-accent text-leiae-bg';
 
@@ -79,4 +88,3 @@ export default function GuidedReadingText({ story, activeWordIndex, fontScale, h
     </div>
   );
 }
-

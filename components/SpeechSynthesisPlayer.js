@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -55,49 +55,55 @@ function findWordIndexByTimeline(words, timelineSeconds, minIndex = 0) {
   return words.length - 1;
 }
 
+function scoreVoice(voice, normalizedGender) {
+  const normalizedName = normalizeString(voice?.name);
+  const normalizedLang = normalizeString(voice?.lang);
+
+  const maleKeywords = ['male', 'mascul', 'homem', 'man', 'paulo', 'joao', 'carlos', 'daniel', 'ricardo', 'mateus'];
+  const femaleKeywords = ['female', 'femin', 'mulher', 'woman', 'ana', 'maria', 'sofia', 'beatriz', 'clara', 'helena'];
+
+  const positiveKeywords = normalizedGender === 'male' ? maleKeywords : femaleKeywords;
+  const negativeKeywords = normalizedGender === 'male' ? femaleKeywords : maleKeywords;
+
+  let score = 0;
+
+  if (normalizedLang.startsWith('pt-br')) {
+    score += 6;
+  } else if (normalizedLang.startsWith('pt')) {
+    score += 4;
+  }
+
+  if (voice?.localService) {
+    score += 0.6;
+  }
+
+  positiveKeywords.forEach((keyword) => {
+    if (normalizedName.includes(keyword)) {
+      score += 2;
+    }
+  });
+
+  negativeKeywords.forEach((keyword) => {
+    if (normalizedName.includes(keyword)) {
+      score -= 1.5;
+    }
+  });
+
+  return score;
+}
+
 function pickVoiceByGender(voices, voiceGender) {
   if (!voices.length) return null;
 
   const normalizedGender = voiceGender === 'male' ? 'male' : 'female';
-  const preferredLocales = voices.filter((voice) => /^pt(-|$)/i.test(voice.lang || ''));
-  const candidates = preferredLocales.length ? preferredLocales : voices;
+  const ptVoices = voices.filter((voice) => /^pt(-|$)/i.test(voice?.lang || ''));
+  const candidatePool = ptVoices.length > 0 ? ptVoices : voices;
 
-  const maleKeywords = ['male', 'mascul', 'homem', 'man', 'paulo', 'joao', 'carlos', 'daniel', 'ricardo', 'mateus'];
-  const femaleKeywords = ['female', 'femin', 'mulher', 'woman', 'ana', 'maria', 'sofia', 'beatriz', 'clara', 'helena'];
-  const positiveKeywords = normalizedGender === 'male' ? maleKeywords : femaleKeywords;
-  const negativeKeywords = normalizedGender === 'male' ? femaleKeywords : maleKeywords;
-
-  let bestVoice = candidates[0] || null;
+  let bestVoice = candidatePool[0] || null;
   let bestScore = Number.NEGATIVE_INFINITY;
 
-  candidates.forEach((voice) => {
-    const normalizedName = normalizeString(voice.name);
-    const normalizedLang = normalizeString(voice.lang);
-
-    let score = 0;
-
-    if (normalizedLang.startsWith('pt-br')) {
-      score += 4;
-    } else if (normalizedLang.startsWith('pt')) {
-      score += 2;
-    }
-
-    if (voice.localService) {
-      score += 0.4;
-    }
-
-    positiveKeywords.forEach((keyword) => {
-      if (normalizedName.includes(keyword)) {
-        score += 2;
-      }
-    });
-
-    negativeKeywords.forEach((keyword) => {
-      if (normalizedName.includes(keyword)) {
-        score -= 2;
-      }
-    });
-
+  candidatePool.forEach((voice) => {
+    const score = scoreVoice(voice, normalizedGender);
     if (score > bestScore) {
       bestScore = score;
       bestVoice = voice;
@@ -158,12 +164,16 @@ export default function SpeechSynthesisPlayer({
   const segmentStartRef = useRef(0);
   const isSeekingRef = useRef(false);
   const pauseAfterStartRef = useRef(false);
+  const userPausedRef = useRef(false);
+  const pendingPlayRef = useRef(false);
   const lastExternalActionRef = useRef(null);
+
   const playbackStartMsRef = useRef(0);
   const playbackBaseSecondsRef = useRef(0);
   const pausedAtMsRef = useRef(null);
   const boundarySeenRef = useRef(false);
   const lastBoundaryAtMsRef = useRef(0);
+
   const activeWordIndexRef = useRef(activeWordIndex);
   const currentWordIndexRef = useRef(0);
 
@@ -229,10 +239,7 @@ export default function SpeechSynthesisPlayer({
         speechText += word.texto;
         const charFim = speechText.length;
 
-        return {
-          charInicio,
-          charFim,
-        };
+        return { charInicio, charFim };
       });
 
       return {
@@ -246,40 +253,52 @@ export default function SpeechSynthesisPlayer({
 
   const stopSpeech = useCallback(
     (nextStatus = 'idle') => {
-      if (!supported) return;
+      if (!supported || typeof window === 'undefined') return;
 
       utteranceTokenRef.current += 1;
       window.speechSynthesis.cancel();
+
       segmentWordsRef.current = [];
       pauseAfterStartRef.current = false;
-      pausedAtMsRef.current = null;
+      userPausedRef.current = false;
+      isSeekingRef.current = false;
+      pendingPlayRef.current = false;
+
       playbackStartMsRef.current = 0;
       playbackBaseSecondsRef.current = 0;
+      pausedAtMsRef.current = null;
       boundarySeenRef.current = false;
       lastBoundaryAtMsRef.current = 0;
 
+      setIsSeeking(false);
       setStatus(nextStatus);
       onPlayStateChange?.(false);
     },
     [onPlayStateChange, supported],
   );
 
-  const speakFrom = useCallback(
-    (targetIndex, rateOverride) => {
-      if (!canUse) return;
+  const startSpeech = useCallback(
+    (targetIndex, options = {}) => {
+      if (!canUse || typeof window === 'undefined') return;
+
+      const pauseAfterStart = Boolean(options.pauseAfterStart);
+      const rateOverride = Number(options.rateOverride);
+      const utteranceRate = Number.isFinite(rateOverride) ? rateOverride : voiceRate;
 
       const { start, speechText, mappedWords } = buildSpeechSegment(targetIndex);
       if (!speechText) return;
 
       const token = utteranceTokenRef.current + 1;
       utteranceTokenRef.current = token;
+
       window.speechSynthesis.cancel();
 
       segmentStartRef.current = start;
       segmentWordsRef.current = mappedWords;
+
       setSeekWordIndex(start);
       setSpeechError('');
-      emitWord(start);
+      emitWord(start, { syncSeek: true });
 
       playbackStartMsRef.current = Date.now();
       playbackBaseSecondsRef.current = getWordStartSeconds(normalizedWords[start], start);
@@ -287,15 +306,16 @@ export default function SpeechSynthesisPlayer({
       boundarySeenRef.current = false;
       lastBoundaryAtMsRef.current = 0;
 
+      pauseAfterStartRef.current = pauseAfterStart;
+      userPausedRef.current = pauseAfterStart;
+
       const utterance = new SpeechSynthesisUtterance(speechText);
       utterance.pitch = 1;
-      utterance.rate = typeof rateOverride === 'number' ? rateOverride : voiceRate;
+      utterance.rate = utteranceRate;
+      utterance.lang = 'pt-BR';
 
       if (selectedVoice) {
         utterance.voice = selectedVoice;
-        utterance.lang = selectedVoice.lang || 'pt-BR';
-      } else {
-        utterance.lang = 'pt-BR';
       }
 
       utterance.onstart = () => {
@@ -303,12 +323,14 @@ export default function SpeechSynthesisPlayer({
 
         if (pauseAfterStartRef.current) {
           pauseAfterStartRef.current = false;
+          pausedAtMsRef.current = Date.now();
           setStatus('paused');
           onPlayStateChange?.(false);
           window.speechSynthesis.pause();
           return;
         }
 
+        userPausedRef.current = false;
         setStatus('playing');
         onPlayStateChange?.(true);
       };
@@ -331,6 +353,20 @@ export default function SpeechSynthesisPlayer({
 
       utterance.onpause = () => {
         if (token !== utteranceTokenRef.current) return;
+
+        const speech = window.speechSynthesis;
+        const expectedPause = userPausedRef.current || pauseAfterStartRef.current;
+
+        if (!expectedPause && speech.speaking) {
+          window.setTimeout(() => {
+            if (token !== utteranceTokenRef.current) return;
+            if (speech.paused && speech.speaking) {
+              speech.resume();
+            }
+          }, 60);
+          return;
+        }
+
         pausedAtMsRef.current = Date.now();
         setStatus('paused');
         onPlayStateChange?.(false);
@@ -344,12 +380,22 @@ export default function SpeechSynthesisPlayer({
           pausedAtMsRef.current = null;
         }
 
+        pauseAfterStartRef.current = false;
+        userPausedRef.current = false;
         setStatus('playing');
         onPlayStateChange?.(true);
       };
 
       utterance.onend = () => {
         if (token !== utteranceTokenRef.current) return;
+
+        pauseAfterStartRef.current = false;
+
+        if (userPausedRef.current && window.speechSynthesis.paused) {
+          return;
+        }
+
+        userPausedRef.current = false;
         emitWord(maxIndex, { syncSeek: true });
         setStatus('idle');
         onPlayStateChange?.(false);
@@ -357,8 +403,11 @@ export default function SpeechSynthesisPlayer({
 
       utterance.onerror = () => {
         if (token !== utteranceTokenRef.current) return;
+
+        pauseAfterStartRef.current = false;
+        userPausedRef.current = false;
         setStatus('idle');
-        setSpeechError('Não foi possível reproduzir a voz automática neste navegador.');
+        setSpeechError('N�o foi poss�vel reproduzir a voz autom�tica neste navegador.');
         onPlayStateChange?.(false);
       };
 
@@ -373,7 +422,7 @@ export default function SpeechSynthesisPlayer({
   }, []);
 
   useEffect(() => {
-    if (!supported) return undefined;
+    if (!supported || typeof window === 'undefined') return undefined;
 
     return () => {
       window.speechSynthesis.cancel();
@@ -381,7 +430,7 @@ export default function SpeechSynthesisPlayer({
   }, [supported]);
 
   useEffect(() => {
-    if (!supported) return undefined;
+    if (!supported || typeof window === 'undefined') return undefined;
 
     const updateVoices = () => {
       const voices = window.speechSynthesis.getVoices() || [];
@@ -390,15 +439,16 @@ export default function SpeechSynthesisPlayer({
 
     updateVoices();
 
-    const speechSynthesis = window.speechSynthesis;
-    if (typeof speechSynthesis.addEventListener === 'function') {
-      speechSynthesis.addEventListener('voiceschanged', updateVoices);
-      return () => speechSynthesis.removeEventListener('voiceschanged', updateVoices);
+    const speech = window.speechSynthesis;
+
+    if (typeof speech.addEventListener === 'function') {
+      speech.addEventListener('voiceschanged', updateVoices);
+      return () => speech.removeEventListener('voiceschanged', updateVoices);
     }
 
-    speechSynthesis.onvoiceschanged = updateVoices;
+    speech.onvoiceschanged = updateVoices;
     return () => {
-      speechSynthesis.onvoiceschanged = null;
+      speech.onvoiceschanged = null;
     };
   }, [supported]);
 
@@ -467,45 +517,6 @@ export default function SpeechSynthesisPlayer({
     };
   }, [canUse, emitWord, isPlaying, normalizedWords, totalWords, voiceRate]);
 
-  const handlePlay = useCallback(() => {
-    if (!supported || !canUse) return;
-
-    if (window.speechSynthesis.paused) {
-      setStatus('playing');
-      onPlayStateChange?.(true);
-      window.speechSynthesis.resume();
-      return;
-    }
-
-    setStatus('playing');
-    onPlayStateChange?.(true);
-    speakFrom(seekWordIndex);
-  }, [canUse, onPlayStateChange, seekWordIndex, speakFrom, supported]);
-
-  const handlePause = useCallback(() => {
-    if (!supported || !canUse) return;
-
-    if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-      setStatus('paused');
-      onPlayStateChange?.(false);
-      window.speechSynthesis.pause();
-
-      if (typeof window.requestAnimationFrame === 'function') {
-        window.requestAnimationFrame(() => {
-          if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-            window.speechSynthesis.pause();
-          }
-        });
-      }
-      return;
-    }
-
-    // Se o áudio ainda está iniciando, pausar assim que começar.
-    pauseAfterStartRef.current = true;
-    setStatus('paused');
-    onPlayStateChange?.(false);
-  }, [canUse, onPlayStateChange, supported]);
-
   const restartFromIndex = useCallback(
     (index, options = {}) => {
       const nextIndex = clamp(index, 0, maxIndex);
@@ -513,15 +524,85 @@ export default function SpeechSynthesisPlayer({
       const rateOverride = options.rateOverride;
 
       if (keepPaused) {
-        pauseAfterStartRef.current = true;
+        userPausedRef.current = true;
         setStatus('paused');
         onPlayStateChange?.(false);
       }
 
-      speakFrom(nextIndex, rateOverride);
+      startSpeech(nextIndex, { pauseAfterStart: keepPaused, rateOverride });
     },
-    [maxIndex, onPlayStateChange, speakFrom],
+    [maxIndex, onPlayStateChange, startSpeech],
   );
+
+  const handlePlay = useCallback(() => {
+    if (!supported || typeof window === 'undefined') return;
+
+    if (!canUse) {
+      pendingPlayRef.current = true;
+      return;
+    }
+
+    const speech = window.speechSynthesis;
+
+    if (speech.paused && speech.speaking) {
+      pendingPlayRef.current = false;
+      userPausedRef.current = false;
+      pauseAfterStartRef.current = false;
+      setStatus('playing');
+      onPlayStateChange?.(true);
+      speech.resume();
+      return;
+    }
+
+    if (speech.speaking && !speech.paused) {
+      pendingPlayRef.current = false;
+      userPausedRef.current = false;
+      pauseAfterStartRef.current = false;
+      setStatus('playing');
+      onPlayStateChange?.(true);
+      return;
+    }
+
+    pendingPlayRef.current = false;
+    userPausedRef.current = false;
+    pauseAfterStartRef.current = false;
+    setStatus('playing');
+    onPlayStateChange?.(true);
+    startSpeech(seekWordIndex, { pauseAfterStart: false });
+  }, [canUse, onPlayStateChange, seekWordIndex, startSpeech, supported]);
+
+  useEffect(() => {
+    if (!canUse || !pendingPlayRef.current) return;
+
+    pendingPlayRef.current = false;
+    handlePlay();
+  }, [canUse, handlePlay]);
+
+  const handlePause = useCallback(() => {
+    if (!supported || !canUse || typeof window === 'undefined') return;
+
+    const speech = window.speechSynthesis;
+
+    userPausedRef.current = true;
+    pauseAfterStartRef.current = false;
+    pausedAtMsRef.current = Date.now();
+    setStatus('paused');
+    onPlayStateChange?.(false);
+
+    if (speech.speaking && !speech.paused) {
+      speech.pause();
+      window.setTimeout(() => {
+        if (speech.speaking && !speech.paused) {
+          speech.pause();
+        }
+      }, 45);
+      return;
+    }
+
+    if (!speech.speaking) {
+      pauseAfterStartRef.current = true;
+    }
+  }, [canUse, onPlayStateChange, supported]);
 
   const handleJump = useCallback(
     (step) => {
@@ -566,11 +647,19 @@ export default function SpeechSynthesisPlayer({
     lastExternalActionRef.current = externalAction.id;
 
     if (externalAction.type === 'toggle-play') {
-      if (isPlaying) {
+      const speech = typeof window !== 'undefined' ? window.speechSynthesis : null;
+      const playingNow = Boolean(speech && speech.speaking && !speech.paused);
+
+      if (isPlaying || playingNow) {
         handlePause();
       } else {
         handlePlay();
       }
+      return;
+    }
+
+    if (externalAction.type === 'stop') {
+      stopSpeech('idle');
       return;
     }
 
@@ -588,7 +677,7 @@ export default function SpeechSynthesisPlayer({
         handleSeekToIndex(index);
       }
     }
-  }, [externalAction, handleJump, handlePause, handlePlay, handleSeekToIndex, isPlaying]);
+  }, [externalAction, handleJump, handlePause, handlePlay, handleSeekToIndex, isPlaying, stopSpeech]);
 
   useEffect(() => {
     onStatusChange?.({
@@ -656,7 +745,7 @@ export default function SpeechSynthesisPlayer({
   if (!supported) {
     return (
       <section className='rounded-3xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card'>
-        <p className='text-sm font-semibold text-leiae-dark/80'>Leitura em voz do navegador não suportada neste dispositivo.</p>
+        <p className='text-sm font-semibold text-leiae-dark/80'>Leitura em voz do navegador n�o suportada neste dispositivo.</p>
       </section>
     );
   }
@@ -679,7 +768,7 @@ export default function SpeechSynthesisPlayer({
           onClick={isPlaying ? handlePause : handlePlay}
           disabled={!canUse}
           className='inline-flex h-12 w-12 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg shadow transition-all duration-200 hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:w-14'
-          aria-label={isPlaying ? 'Pausar leitura automática' : 'Iniciar leitura automática'}
+          aria-label={isPlaying ? 'Pausar leitura autom�tica' : 'Iniciar leitura autom�tica'}
         >
           {isPlaying ? <PauseIcon /> : <PlayIcon />}
         </button>
@@ -689,7 +778,7 @@ export default function SpeechSynthesisPlayer({
           onClick={() => handleJump(8)}
           disabled={!canUse}
           className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 sm:h-11 sm:w-11'
-          aria-label='Avançar leitura'
+          aria-label='Avan�ar leitura'
         >
           <ForwardIcon />
         </button>
@@ -747,7 +836,7 @@ export default function SpeechSynthesisPlayer({
             {voiceRate.toFixed(1)}x
           </span>
           {isSeeking ? (
-            <span className='rounded-full bg-leiae-accent/15 px-3 py-1 text-xs font-semibold text-leiae-dark'>Ajustando posição...</span>
+            <span className='rounded-full bg-leiae-accent/15 px-3 py-1 text-xs font-semibold text-leiae-dark'>Ajustando posi��o...</span>
           ) : null}
         </div>
       </div>
@@ -767,7 +856,7 @@ export default function SpeechSynthesisPlayer({
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div>
           <h2 className='font-display text-lg font-bold text-leiae-dark'>Player de leitura robotizada</h2>
-          <p className='text-sm text-leiae-text/75'>Controle a leitura como em um player de áudio/vídeo</p>
+          <p className='text-sm text-leiae-text/75'>Controle a leitura como em um player de �udio/v�deo</p>
         </div>
 
         <span className='inline-flex items-center gap-2 rounded-full border border-leiae-dark/10 bg-white/80 px-3 py-1 text-xs font-semibold text-leiae-dark/80'>
@@ -780,4 +869,3 @@ export default function SpeechSynthesisPlayer({
     </section>
   );
 }
-

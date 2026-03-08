@@ -1,4 +1,4 @@
-Ôªøimport Head from 'next/head';
+import Head from 'next/head';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -111,7 +111,7 @@ function buildPageRanges(words) {
     if (!isLastChunk) {
       const searchStart = Math.max(start + minWordsPerPage - 1, start);
       for (let i = end; i >= searchStart; i -= 1) {
-        if (/[.!?‚Ä¶]$/.test(words[i].texto)) {
+        if (/[.!?Ö]$/.test(words[i].texto)) {
           end = i;
           break;
         }
@@ -130,6 +130,16 @@ export default function LeituraPage() {
   const { id } = router.query;
   const readingSurfaceRef = useRef(null);
   const speechActionIdRef = useRef(0);
+  const speechStatusRef = useRef({
+    supported: true,
+    canUse: false,
+    isPlaying: false,
+    isPaused: false,
+    currentWordIndex: 0,
+    totalWords: 0,
+    progressPercent: 0,
+  });
+  const guidedPlayingRef = useRef(false);
 
   const story = useMemo(() => (typeof id === 'string' ? getStoryById(id) : null), [id]);
 
@@ -143,6 +153,8 @@ export default function LeituraPage() {
 
   const [controlsCollapsed, setControlsCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hideBottomPanelMobile, setHideBottomPanelMobile] = useState(false);
+  const [centerOnWordToken, setCenterOnWordToken] = useState(0);
 
   const [guidedPlaying, setGuidedPlaying] = useState(false);
   const [guidedSpeed, setGuidedSpeed] = useState(defaultReadingPreferences.guidedSpeed);
@@ -159,20 +171,25 @@ export default function LeituraPage() {
     progressPercent: 0,
   });
 
+  useEffect(() => {
+    guidedPlayingRef.current = guidedPlaying;
+  }, [guidedPlaying]);
+
   const totalWords = story?.palavras?.length ?? 1;
-  const pageTitle = story ? `${story.titulo} | Leia√ä` : 'Leitura | Leia√ä';
+  const pageTitle = story ? `${story.titulo} | Leia ` : 'Leitura | Leia ';
 
   const roboticVoiceActive = voiceMode === 'robotic';
   const showSidePanel = !controlsCollapsed;
 
-  const speechSyncActive = roboticVoiceActive && (speechStatus.isPlaying || speechStatus.isPaused) && (story?.palavras?.length ?? 0) > 0;
+  const speechSyncActive =
+    roboticVoiceActive &&
+    (speechStatus.isPlaying || speechStatus.isPaused) &&
+    (story?.palavras?.length ?? 0) > 0;
 
   const canIncreaseSpeed = guidedSpeed < 3;
   const canDecreaseSpeed = guidedSpeed > 0.5;
 
-  const syncLabel = speechSyncActive
-    ? 'Sincronizado com voz robotizada'
-    : 'Modo visual independente';
+  const syncLabel = speechSyncActive ? 'Sincronizado com voz robotizada' : 'Modo visual independente';
 
   const pageRanges = useMemo(() => buildPageRanges(story?.palavras), [story]);
 
@@ -193,6 +210,20 @@ export default function LeituraPage() {
       type,
       ...payload,
     });
+  }, []);
+
+  const handleSpeechStatus = useCallback((nextStatus) => {
+    const previous = speechStatusRef.current;
+    speechStatusRef.current = nextStatus;
+    setSpeechStatus(nextStatus);
+
+    if (guidedPlayingRef.current && (nextStatus.isPlaying || nextStatus.isPaused)) {
+      setGuidedPlaying(false);
+    }
+
+    if (previous.isPaused && nextStatus.isPlaying) {
+      setCenterOnWordToken((previousToken) => previousToken + 1);
+    }
   }, []);
 
   useEffect(() => {
@@ -241,6 +272,7 @@ export default function LeituraPage() {
 
     setControlsCollapsed(false);
     setGuidedPlaying(false);
+    setHideBottomPanelMobile(false);
     setGuidedWordIndex(Math.min(initialWordIndex, maxWordIndex));
   }, [story, router.isReady, router.query.w]);
 
@@ -256,22 +288,24 @@ export default function LeituraPage() {
 
     return () => clearTimeout(timer);
   }, [guidedWordIndex, story]);
+
   useEffect(() => {
     if (roboticVoiceActive) return;
 
-    setSpeechStatus((previous) => {
-      if (!previous.isPlaying && !previous.isPaused) {
-        return previous;
-      }
+    if (speechStatusRef.current.isPlaying || speechStatusRef.current.isPaused) {
+      dispatchSpeechAction('stop');
+    }
 
-      return {
-        ...previous,
-        isPlaying: false,
-        isPaused: false,
-        progressPercent: 0,
-      };
-    });
-  }, [roboticVoiceActive]);
+    const resetStatus = {
+      ...speechStatusRef.current,
+      isPlaying: false,
+      isPaused: false,
+      progressPercent: 0,
+    };
+
+    speechStatusRef.current = resetStatus;
+    setSpeechStatus(resetStatus);
+  }, [dispatchSpeechAction, roboticVoiceActive]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -287,6 +321,11 @@ export default function LeituraPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (isFullscreen) return;
+    setHideBottomPanelMobile(false);
+  }, [isFullscreen]);
+
   const toggleFullscreen = async () => {
     if (typeof document === 'undefined') return;
 
@@ -297,7 +336,7 @@ export default function LeituraPage() {
         await document.exitFullscreen?.();
       }
     } catch (_error) {
-      // Ignora erro de permiss√£o/ambiente.
+      // Ignora erro de permiss„o/ambiente.
     }
   };
 
@@ -333,6 +372,10 @@ export default function LeituraPage() {
       return;
     }
 
+    if (roboticVoiceActive && (speechStatusRef.current.isPlaying || speechStatusRef.current.isPaused)) {
+      dispatchSpeechAction('stop');
+    }
+
     if (guidedWordIndex >= totalWords - 1) {
       setGuidedWordIndex(0);
     }
@@ -348,15 +391,25 @@ export default function LeituraPage() {
     setGuidedSpeed((previous) => Number(Math.max(0.5, previous - 0.25).toFixed(2)));
   };
 
-  const quickDisabled = !roboticVoiceActive || !speechStatus.canUse;
+  const quickDisabled = !roboticVoiceActive || !speechStatus.supported;
 
   const handleQuickJump = (step) => {
     if (quickDisabled) return;
+
+    if (guidedPlayingRef.current) {
+      setGuidedPlaying(false);
+    }
+
     dispatchSpeechAction('jump', { step });
   };
 
   const handleQuickToggle = () => {
     if (quickDisabled) return;
+
+    if (guidedPlayingRef.current) {
+      setGuidedPlaying(false);
+    }
+
     dispatchSpeechAction('toggle-play');
   };
 
@@ -368,7 +421,7 @@ export default function LeituraPage() {
 
     setGuidedWordIndex(targetIndex);
 
-    if (roboticVoiceActive) {
+    if (roboticVoiceActive && (speechStatusRef.current.isPlaying || speechStatusRef.current.isPaused)) {
       dispatchSpeechAction('seek', { index: targetIndex });
     }
   };
@@ -382,13 +435,13 @@ export default function LeituraPage() {
       <>
         <Head>
           <meta charSet='UTF-8' />
-          <title>Leitura | Leia√ä</title>
-          <meta name='description' content='Tela de leitura acess√≠vel do Leia√ä.' />
+          <title>Leitura | Leia </title>
+          <meta name='description' content='Tela de leitura acessÌvel do Leia .' />
         </Head>
 
         <main className='flex min-h-screen items-center justify-center bg-leiae-bg px-6 text-center text-leiae-dark'>
           <div>
-            <p className='text-xl font-semibold'>Hist√≥ria n√£o encontrada.</p>
+            <p className='text-xl font-semibold'>HistÛria n„o encontrada.</p>
             <Link href='/biblioteca' className='mt-5 inline-flex rounded-xl bg-leiae-accent px-5 py-3 font-bold text-leiae-bg'>
               Voltar para biblioteca
             </Link>
@@ -411,11 +464,11 @@ export default function LeituraPage() {
       <Head>
         <meta charSet='UTF-8' />
         <title>{pageTitle}</title>
-        <meta name='description' content={`Leitura da hist√≥ria ${story.titulo} no Leia√ä.`} />
+        <meta name='description' content={`Leitura da histÛria ${story.titulo} no Leia .`} />
       </Head>
 
       <AppShell
-        title='Leia√ä'
+        title='Leia '
         subtitle='Modo leitura'
         activeTab='leitura'
         darkHeader
@@ -496,8 +549,8 @@ export default function LeituraPage() {
                       onClick={() => handleQuickJump(3)}
                       disabled={quickDisabled}
                       className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-                      aria-label='Avan√ßar 3 palavras'
-                      title='Avan√ßar 3 palavras'
+                      aria-label='AvanÁar 3 palavras'
+                      title='AvanÁar 3 palavras'
                     >
                       <QuickForwardIcon />
                     </button>
@@ -518,6 +571,7 @@ export default function LeituraPage() {
                 fontScale={fontScale}
                 highContrast={highContrast}
                 visibleRange={currentPageRange}
+                centerOnWordToken={centerOnWordToken}
               />
 
               <div className='mt-8 border-t border-leiae-dark/10 pt-4'>
@@ -527,13 +581,13 @@ export default function LeituraPage() {
                     onClick={() => navigatePage(-1)}
                     disabled={currentPageIndex <= 0}
                     className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-                    aria-label='P√°gina anterior'
+                    aria-label='P·gina anterior'
                   >
                     <ArrowIcon direction='left' />
                   </button>
 
                   <span className='rounded-full bg-leiae-dark/10 px-3 py-1 text-xs font-semibold text-leiae-dark/75'>
-                    P√°gina {currentPageIndex + 1}/{pageRanges.length}
+                    P·gina {currentPageIndex + 1}/{pageRanges.length}
                   </span>
 
                   <button
@@ -541,7 +595,7 @@ export default function LeituraPage() {
                     onClick={() => navigatePage(1)}
                     disabled={currentPageIndex >= pageRanges.length - 1}
                     className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-                    aria-label='Pr√≥xima p√°gina'
+                    aria-label='PrÛxima p·gina'
                   >
                     <ArrowIcon direction='right' />
                   </button>
@@ -550,7 +604,11 @@ export default function LeituraPage() {
             </article>
           </div>
 
-          <section className='sticky bottom-2 z-30 mt-4 rounded-2xl border border-leiae-dark/15 bg-leiae-paper/95 p-3 shadow-warm backdrop-blur sm:p-4'>
+          <section
+            className={`sticky bottom-2 z-30 mt-4 rounded-2xl border border-leiae-dark/15 bg-leiae-paper/95 p-3 shadow-warm backdrop-blur sm:p-4 ${
+              isFullscreen && hideBottomPanelMobile ? 'hidden md:block' : ''
+            }`}
+          >
             <div className='grid grid-cols-[auto,1fr,auto] items-start gap-3'>
               <button
                 type='button'
@@ -574,6 +632,16 @@ export default function LeituraPage() {
                   >
                     {focusMode ? 'Foco ativo' : 'Modo foco'}
                   </button>
+
+                  {isFullscreen ? (
+                    <button
+                      type='button'
+                      onClick={() => setHideBottomPanelMobile(true)}
+                      className='rounded-full border border-leiae-dark/20 bg-white px-2.5 py-1 text-xs font-semibold text-leiae-dark transition hover:bg-leiae-bg md:hidden'
+                    >
+                      Ocultar painel
+                    </button>
+                  ) : null}
                 </div>
 
                 <div className='flex flex-wrap items-center justify-center gap-2'>
@@ -607,13 +675,13 @@ export default function LeituraPage() {
                     voiceGender={voiceGender}
                     onWordBoundary={setGuidedWordIndex}
                     onRateChange={setVoiceRate}
-                    onStatusChange={setSpeechStatus}
+                    onStatusChange={handleSpeechStatus}
                     externalAction={speechAction}
                     compact
                   />
                 ) : (
                   <div className='rounded-2xl border border-leiae-dark/10 bg-white/80 px-3 py-2 text-center text-xs font-semibold text-leiae-dark/75'>
-                    Leitura humanizada ainda n√£o dispon√≠vel.
+                    Leitura humanizada ainda n„o disponÌvel.
                   </div>
                 )}
               </div>
@@ -628,20 +696,18 @@ export default function LeituraPage() {
               </button>
             </div>
           </section>
+
+          {isFullscreen && hideBottomPanelMobile ? (
+            <button
+              type='button'
+              onClick={() => setHideBottomPanelMobile(false)}
+              className='fixed bottom-4 right-4 z-40 rounded-full bg-leiae-accent px-4 py-2 text-xs font-semibold text-leiae-bg shadow-lg transition hover:bg-leiae-dark md:hidden'
+            >
+              Mostrar controles
+            </button>
+          ) : null}
         </section>
       </AppShell>
     </>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
