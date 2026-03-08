@@ -22,6 +22,13 @@ export default function AppShell({
   readingHref = '/biblioteca',
   maxWidthClass = 'max-w-[430px] sm:max-w-[560px] md:max-w-4xl lg:max-w-6xl',
 }) {
+  const tabs = [
+    { id: 'home', label: 'Início', href: '/' },
+    { id: 'biblioteca', label: 'Biblioteca', href: '/biblioteca' },
+    { id: 'leitura', label: 'Leitura', href: readingHref },
+    { id: 'config', label: 'Ajustes', href: '/ajustes' },
+  ];
+
   return (
     <main className='min-h-screen bg-grainWarm px-0 py-0 sm:px-4 sm:py-4 lg:px-8 lg:py-6'>
       <div
@@ -68,34 +75,27 @@ export default function AppShell({
 
           {showTopNav && !backHref ? (
             <nav className='mt-4 flex flex-wrap gap-2'>
-              <Link
-                href='/'
-                className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                  activeTab === 'home'
-                    ? darkHeader
-                      ? 'bg-leiae-bg text-leiae-accent'
-                      : 'bg-leiae-accent text-leiae-bg'
-                    : darkHeader
-                      ? 'bg-black/15 text-leiae-bg/90'
-                      : 'bg-leiae-dark/10 text-leiae-dark/80'
-                }`}
-              >
-                Início
-              </Link>
-              <Link
-                href='/biblioteca'
-                className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                  activeTab === 'biblioteca'
-                    ? darkHeader
-                      ? 'bg-leiae-bg text-leiae-accent'
-                      : 'bg-leiae-accent text-leiae-bg'
-                    : darkHeader
-                      ? 'bg-black/15 text-leiae-bg/90'
-                      : 'bg-leiae-dark/10 text-leiae-dark/80'
-                }`}
-              >
-                Biblioteca
-              </Link>
+              {tabs.map((tab) => {
+                const active = activeTab === tab.id;
+
+                return (
+                  <Link
+                    key={tab.id}
+                    href={tab.href}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                      active
+                        ? darkHeader
+                          ? 'bg-leiae-bg text-leiae-accent'
+                          : 'bg-leiae-accent text-leiae-bg'
+                        : darkHeader
+                          ? 'bg-black/15 text-leiae-bg/90 hover:bg-black/25'
+                          : 'bg-leiae-dark/10 text-leiae-dark/80 hover:bg-leiae-dark/15'
+                    }`}
+                  >
+                    {tab.label}
+                  </Link>
+                );
+              })}
             </nav>
           ) : null}
         </header>

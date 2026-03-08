@@ -4,7 +4,7 @@ const tabs = [
   { id: 'home', label: 'Início', href: '/' },
   { id: 'biblioteca', label: 'Biblioteca', href: '/biblioteca' },
   { id: 'leitura', label: 'Leitura', href: '/biblioteca' },
-  { id: 'config', label: 'Ajustes', href: '/biblioteca' },
+  { id: 'config', label: 'Ajustes', href: '/ajustes' },
 ];
 
 function Icon({ type }) {
@@ -60,8 +60,8 @@ export default function BottomNav({ active = 'home', readingHref = '/biblioteca'
                 }`}
               >
                 <span
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full ${
-                    activeItem ? 'bg-leiae-accent text-leiae-bg' : 'bg-transparent'
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition ${
+                    activeItem ? 'bg-leiae-accent text-leiae-bg shadow' : 'bg-transparent'
                   }`}
                 >
                   <Icon type={item.id} />

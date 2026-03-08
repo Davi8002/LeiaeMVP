@@ -41,20 +41,18 @@ function PauseIcon() {
   );
 }
 
-function ResumeIcon() {
+function ForwardIcon() {
   return (
     <svg viewBox='0 0 24 24' className='h-5 w-5' fill='none' stroke='currentColor' strokeWidth='2'>
-      <path d='M9 6v12l8-6-8-6z' strokeLinecap='round' strokeLinejoin='round' />
-      <path d='M5.5 7.5V16.5' strokeLinecap='round' />
+      <path d='M6 8l6 4-6 4V8zM12 8l6 4-6 4V8z' strokeLinecap='round' strokeLinejoin='round' />
     </svg>
   );
 }
 
-function RestartIcon() {
+function BackwardIcon() {
   return (
     <svg viewBox='0 0 24 24' className='h-5 w-5' fill='none' stroke='currentColor' strokeWidth='2'>
-      <path d='M4 12a8 8 0 1 0 2.3-5.7' strokeLinecap='round' />
-      <path d='M4 4v4.5h4.5' strokeLinecap='round' strokeLinejoin='round' />
+      <path d='M18 8l-6 4 6 4V8zM12 8l-6 4 6 4V8z' strokeLinecap='round' strokeLinejoin='round' />
     </svg>
   );
 }
@@ -63,20 +61,24 @@ export default function SpeechSynthesisPlayer({
   text,
   words,
   activeWordIndex,
+  initialRate = 1,
   onWordBoundary,
   onPlayStateChange,
+  onRateChange,
 }) {
   const utteranceRef = useRef(null);
+  const utteranceTokenRef = useRef(0);
   const segmentWordsRef = useRef([]);
   const segmentStartRef = useRef(0);
-  const pendingRateRestartRef = useRef(false);
+  const isSeekingRef = useRef(false);
 
   const [supported, setSupported] = useState(false);
   const [status, setStatus] = useState('idle');
-  const [voiceRate, setVoiceRate] = useState(1);
-  const [selectedWordIndex, setSelectedWordIndex] = useState(0);
+  const [voiceRate, setVoiceRate] = useState(clamp(Number(initialRate) || 1, 0.6, 2));
+  const [seekWordIndex, setSeekWordIndex] = useState(0);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [speechError, setSpeechError] = useState('');
+  const [isSeeking, setIsSeeking] = useState(false);
 
   const normalizedWords = useMemo(() => {
     if (Array.isArray(words) && words.length > 0) {
@@ -96,9 +98,12 @@ export default function SpeechSynthesisPlayer({
   const isPaused = status === 'paused';
 
   const emitWord = useCallback(
-    (index) => {
+    (index, options = {}) => {
       const bounded = clamp(index, 0, maxIndex);
       setCurrentWordIndex(bounded);
+      if (options.syncSeek) {
+        setSeekWordIndex(bounded);
+      }
       onWordBoundary?.(bounded);
     },
     [maxIndex, onWordBoundary],
@@ -110,7 +115,7 @@ export default function SpeechSynthesisPlayer({
       const segment = normalizedWords.slice(start);
       let speechText = '';
 
-      const mappedWords = segment.map((word, localIndex) => {
+      const mappedWords = segment.map((word) => {
         if (speechText.length > 0) {
           speechText += ' ';
         }
@@ -120,7 +125,6 @@ export default function SpeechSynthesisPlayer({
         const charFim = speechText.length;
 
         return {
-          localIndex,
           charInicio,
           charFim,
         };
@@ -139,6 +143,7 @@ export default function SpeechSynthesisPlayer({
     (nextStatus = 'idle') => {
       if (!supported) return;
 
+      utteranceTokenRef.current += 1;
       window.speechSynthesis.cancel();
       utteranceRef.current = null;
       segmentWordsRef.current = [];
@@ -149,53 +154,63 @@ export default function SpeechSynthesisPlayer({
   );
 
   const speakFrom = useCallback(
-    (targetIndex) => {
+    (targetIndex, rateOverride) => {
       if (!canUse) return;
 
       const { start, speechText, mappedWords } = buildSpeechSegment(targetIndex);
       if (!speechText) return;
 
+      const token = utteranceTokenRef.current + 1;
+      utteranceTokenRef.current = token;
       window.speechSynthesis.cancel();
+
       segmentStartRef.current = start;
       segmentWordsRef.current = mappedWords;
-      setSelectedWordIndex(start);
+      setSeekWordIndex(start);
       setSpeechError('');
       emitWord(start);
 
       const utterance = new SpeechSynthesisUtterance(speechText);
       utterance.lang = 'pt-BR';
       utterance.pitch = 1;
-      utterance.rate = voiceRate;
+      utterance.rate = typeof rateOverride === 'number' ? rateOverride : voiceRate;
 
       utterance.onstart = () => {
+        if (token !== utteranceTokenRef.current) return;
         setStatus('playing');
         onPlayStateChange?.(true);
       };
 
       utterance.onboundary = (event) => {
-        if (typeof event.charIndex !== 'number') return;
+        if (token !== utteranceTokenRef.current) return;
+        if (isSeekingRef.current || typeof event.charIndex !== 'number') return;
+
         const localWordIndex = getLocalWordIndexByChar(segmentWordsRef.current, event.charIndex);
         const globalWordIndex = clamp(segmentStartRef.current + localWordIndex, 0, maxIndex);
-        emitWord(globalWordIndex);
+        emitWord(globalWordIndex, { syncSeek: true });
       };
 
       utterance.onpause = () => {
+        if (token !== utteranceTokenRef.current) return;
         setStatus('paused');
         onPlayStateChange?.(false);
       };
 
       utterance.onresume = () => {
+        if (token !== utteranceTokenRef.current) return;
         setStatus('playing');
         onPlayStateChange?.(true);
       };
 
       utterance.onend = () => {
-        emitWord(maxIndex);
+        if (token !== utteranceTokenRef.current) return;
+        emitWord(maxIndex, { syncSeek: true });
         setStatus('idle');
         onPlayStateChange?.(false);
       };
 
       utterance.onerror = () => {
+        if (token !== utteranceTokenRef.current) return;
         setStatus('idle');
         setSpeechError('Não foi possível reproduzir a voz automática neste navegador.');
         onPlayStateChange?.(false);
@@ -221,76 +236,106 @@ export default function SpeechSynthesisPlayer({
   }, [supported]);
 
   useEffect(() => {
+    const nextRate = clamp(Number(initialRate) || 1, 0.6, 2);
+    setVoiceRate(nextRate);
+  }, [initialRate]);
+
+  useEffect(() => {
     if (!supported) return;
 
+    const nextRate = clamp(Number(initialRate) || 1, 0.6, 2);
+
     stopSpeech('idle');
-    setVoiceRate(1);
+    setVoiceRate(nextRate);
     setSpeechError('');
-    setSelectedWordIndex(0);
+    setSeekWordIndex(0);
     setCurrentWordIndex(0);
     onWordBoundary?.(0);
-  }, [onWordBoundary, stopSpeech, supported, text]);
+  }, [initialRate, onWordBoundary, stopSpeech, supported, text]);
 
   useEffect(() => {
     if (typeof activeWordIndex !== 'number') return;
-    setCurrentWordIndex(clamp(activeWordIndex, 0, maxIndex));
-  }, [activeWordIndex, maxIndex]);
+    if (isSeekingRef.current) return;
 
-  useEffect(() => {
-    if (!pendingRateRestartRef.current) return;
+    const bounded = clamp(activeWordIndex, 0, maxIndex);
+    setCurrentWordIndex(bounded);
 
-    pendingRateRestartRef.current = false;
-    if (isPlaying) {
-      speakFrom(currentWordIndex);
+    if (!isPlaying) {
+      setSeekWordIndex(bounded);
     }
-  }, [currentWordIndex, isPlaying, speakFrom, voiceRate]);
+  }, [activeWordIndex, isPlaying, maxIndex]);
+
+  const handlePlay = () => {
+    if (!supported || !canUse) return;
+
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+      return;
+    }
+
+    speakFrom(seekWordIndex);
+  };
 
   const handlePause = () => {
     if (!supported || !canUse) return;
+
     if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
       window.speechSynthesis.pause();
     }
   };
 
-  const handleContinue = () => {
-    if (!supported || !canUse) return;
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-    }
-  };
-
-  const handleRestart = () => {
-    setSelectedWordIndex(0);
-    speakFrom(0);
-  };
-
   const handleJump = (step) => {
     const nextIndex = clamp(currentWordIndex + step, 0, maxIndex);
-    setSelectedWordIndex(nextIndex);
-    speakFrom(nextIndex);
+    setSeekWordIndex(nextIndex);
+    emitWord(nextIndex);
+
+    if (isPlaying || isPaused) {
+      speakFrom(nextIndex);
+    }
   };
 
   const handleRate = (delta) => {
     setVoiceRate((previous) => {
       const next = clamp(Number((previous + delta).toFixed(1)), 0.6, 2);
-      if (next !== previous && isPlaying) {
-        pendingRateRestartRef.current = true;
+
+      if (next !== previous) {
+        onRateChange?.(next);
+
+        if (isPlaying || isPaused) {
+          speakFrom(currentWordIndex, next);
+        }
       }
+
       return next;
     });
   };
 
-  const handleSeekApply = () => {
+  const beginSeek = () => {
+    isSeekingRef.current = true;
+    setIsSeeking(true);
+  };
+
+  const handleSeekChange = (event) => {
+    const nextIndex = Number(event.target.value);
+    setSeekWordIndex(nextIndex);
+    emitWord(nextIndex);
+  };
+
+  const applySeek = (force = false) => {
+    if (!isSeekingRef.current && !force) return;
+
+    isSeekingRef.current = false;
+    setIsSeeking(false);
+
     if (isPlaying || isPaused) {
-      speakFrom(selectedWordIndex);
+      speakFrom(seekWordIndex);
       return;
     }
 
-    emitWord(selectedWordIndex);
+    emitWord(seekWordIndex, { syncSeek: true });
   };
 
   const progressPercent = totalWords > 1 ? (currentWordIndex / (totalWords - 1)) * 100 : 0;
-  const seekPercent = totalWords > 1 ? (selectedWordIndex / (totalWords - 1)) * 100 : 0;
 
   if (!supported) {
     return (
@@ -304,130 +349,103 @@ export default function SpeechSynthesisPlayer({
     <section className='rounded-3xl border border-leiae-dark/10 bg-gradient-to-br from-white/95 via-leiae-paper to-[#f2ddc8] p-4 shadow-warm sm:p-5'>
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div>
-          <h2 className='font-display text-lg font-bold text-leiae-dark'>Leitura automática (voz)</h2>
-          <p className='text-sm text-leiae-text/75'>Narração com sincronização palavra por palavra</p>
+          <h2 className='font-display text-lg font-bold text-leiae-dark'>Player de leitura robotizada</h2>
+          <p className='text-sm text-leiae-text/75'>Controle a leitura como em um player de áudio/vídeo</p>
         </div>
 
-        <span className='inline-flex items-center gap-2 rounded-full border border-leiae-dark/10 bg-white/75 px-3 py-1 text-xs font-semibold text-leiae-dark/80'>
+        <span className='inline-flex items-center gap-2 rounded-full border border-leiae-dark/10 bg-white/80 px-3 py-1 text-xs font-semibold text-leiae-dark/80'>
           <span className={`h-2.5 w-2.5 rounded-full ${isPlaying ? 'animate-pulseSoft bg-leiae-accent' : 'bg-leiae-dark/30'}`} aria-hidden='true' />
-          {isPlaying ? 'Leitura ativa' : isPaused ? 'Pausado' : 'Pronto'}
+          {isPlaying ? 'Reproduzindo' : isPaused ? 'Pausado' : 'Pronto'}
         </span>
       </div>
 
-      <div className='mt-4 rounded-2xl border border-leiae-dark/10 bg-white/75 p-3'>
-        <div className='h-2 w-full overflow-hidden rounded-full bg-leiae-dark/15'>
-          <div className='h-full rounded-full bg-leiae-accent transition-all duration-150' style={{ width: `${progressPercent}%` }} />
-        </div>
-        <div className='mt-2 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-leiae-dark/70'>
-          <span>Progresso: {Math.min(currentWordIndex + 1, totalWords)}/{Math.max(totalWords, 1)} palavras</span>
-          <span>Velocidade: {voiceRate.toFixed(1)}x</span>
-        </div>
-      </div>
-
-      <div className='mt-4 grid gap-2 sm:grid-cols-2'>
+      <div className='mt-4 flex flex-wrap items-center justify-center gap-2 sm:gap-3'>
         <button
           type='button'
-          onClick={() => speakFrom(selectedWordIndex)}
+          onClick={() => handleJump(-8)}
           disabled={!canUse}
-          className='inline-flex items-center justify-center gap-2 rounded-full bg-leiae-accent px-4 py-2.5 text-sm font-bold text-leiae-bg transition hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-50'
+          className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+          aria-label='Voltar leitura'
         >
-          <PlayIcon />
-          Iniciar
+          <BackwardIcon />
         </button>
 
         <button
           type='button'
-          onClick={handlePause}
-          disabled={!canUse || !isPlaying}
-          className='inline-flex items-center justify-center gap-2 rounded-full border border-leiae-dark/25 bg-white px-4 py-2.5 text-sm font-bold text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-        >
-          <PauseIcon />
-          Pausar
-        </button>
-
-        <button
-          type='button'
-          onClick={handleContinue}
-          disabled={!canUse || !isPaused}
-          className='inline-flex items-center justify-center gap-2 rounded-full border border-leiae-dark/25 bg-white px-4 py-2.5 text-sm font-bold text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-        >
-          <ResumeIcon />
-          Continuar
-        </button>
-
-        <button
-          type='button'
-          onClick={handleRestart}
+          onClick={isPlaying ? handlePause : handlePlay}
           disabled={!canUse}
-          className='inline-flex items-center justify-center gap-2 rounded-full border border-leiae-dark/25 bg-white px-4 py-2.5 text-sm font-bold text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+          className='inline-flex h-14 w-14 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg shadow transition-all duration-200 hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-50'
+          aria-label={isPlaying ? 'Pausar leitura automática' : 'Iniciar leitura automática'}
         >
-          <RestartIcon />
-          Reiniciar
+          {isPlaying ? <PauseIcon /> : <PlayIcon />}
+        </button>
+
+        <button
+          type='button'
+          onClick={() => handleJump(8)}
+          disabled={!canUse}
+          className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+          aria-label='Avançar leitura'
+        >
+          <ForwardIcon />
         </button>
       </div>
 
-      <div className='mt-4 grid gap-3 rounded-2xl border border-leiae-dark/10 bg-white/75 p-3'>
-        <label className='text-sm font-semibold text-leiae-dark'>Começar de um ponto específico</label>
+      <div className='mt-4 rounded-2xl border border-leiae-dark/10 bg-white/85 p-3 sm:p-4'>
+        <div className='flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-leiae-dark/75'>
+          <span>Palavra {Math.min(currentWordIndex + 1, totalWords)}/{Math.max(totalWords, 1)}</span>
+          <span>{Math.round(progressPercent)}%</span>
+        </div>
+
         <input
           type='range'
           min={0}
           max={maxIndex}
-          value={selectedWordIndex}
-          onChange={(event) => setSelectedWordIndex(Number(event.target.value))}
-          className='w-full accent-leiae-accent'
+          value={seekWordIndex}
+          onChange={handleSeekChange}
+          onMouseDown={beginSeek}
+          onTouchStart={beginSeek}
+          onMouseUp={() => applySeek()}
+          onTouchEnd={() => applySeek()}
+          onBlur={() => applySeek(true)}
+          onKeyUp={(event) => {
+            if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+              applySeek(true);
+            }
+          }}
+          className='mt-2 w-full accent-leiae-accent'
           disabled={!canUse}
-          aria-label='Selecionar palavra para iniciar a leitura'
+          aria-label='Barra de progresso da leitura robotizada'
         />
 
-        <div className='h-1.5 w-full overflow-hidden rounded-full bg-leiae-dark/10'>
-          <div className='h-full rounded-full bg-leiae-accent/60 transition-all duration-150' style={{ width: `${seekPercent}%` }} />
+        <div className='mt-2 h-1.5 w-full overflow-hidden rounded-full bg-leiae-dark/10'>
+          <div className='h-full rounded-full bg-leiae-accent transition-all duration-200' style={{ width: `${progressPercent}%` }} />
         </div>
 
-        <div className='flex flex-wrap items-center gap-2'>
+        <div className='mt-3 flex flex-wrap items-center gap-2'>
           <button
             type='button'
-            onClick={() => handleJump(-10)}
-            disabled={!canUse}
-            className='rounded-full border border-leiae-dark/20 px-3 py-2 text-sm font-semibold text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+            onClick={() => handleRate(-0.1)}
+            disabled={voiceRate <= 0.6}
+            className='rounded-full border border-leiae-dark/20 px-3 py-1.5 text-sm font-semibold text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
           >
-            Voltar 10 palavras
+            Velocidade -
           </button>
           <button
             type='button'
-            onClick={() => handleJump(10)}
-            disabled={!canUse}
-            className='rounded-full border border-leiae-dark/20 px-3 py-2 text-sm font-semibold text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+            onClick={() => handleRate(0.1)}
+            disabled={voiceRate >= 2}
+            className='rounded-full border border-leiae-dark/20 px-3 py-1.5 text-sm font-semibold text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
           >
-            Avançar 10 palavras
+            Velocidade +
           </button>
-          <button
-            type='button'
-            onClick={handleSeekApply}
-            disabled={!canUse}
-            className='rounded-full bg-leiae-dark px-3 py-2 text-sm font-semibold text-leiae-bg transition hover:bg-leiae-accent disabled:cursor-not-allowed disabled:opacity-45'
-          >
-            Ir para ponto
-          </button>
+          <span className='rounded-full border border-leiae-dark/15 bg-leiae-bg px-3 py-1 text-xs font-semibold text-leiae-dark/80'>
+            {voiceRate.toFixed(1)}x
+          </span>
+          {isSeeking ? (
+            <span className='rounded-full bg-leiae-accent/15 px-3 py-1 text-xs font-semibold text-leiae-dark'>Ajustando posição...</span>
+          ) : null}
         </div>
-      </div>
-
-      <div className='mt-4 flex flex-wrap items-center gap-2'>
-        <button
-          type='button'
-          onClick={() => handleRate(-0.1)}
-          disabled={voiceRate <= 0.6}
-          className='rounded-full border border-leiae-dark/20 px-3 py-2 text-sm font-semibold text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-        >
-          Velocidade -
-        </button>
-        <button
-          type='button'
-          onClick={() => handleRate(0.1)}
-          disabled={voiceRate >= 2}
-          className='rounded-full border border-leiae-dark/20 px-3 py-2 text-sm font-semibold text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-        >
-          Velocidade +
-        </button>
       </div>
 
       {speechError ? (
