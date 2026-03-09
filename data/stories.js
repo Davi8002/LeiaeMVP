@@ -1,5 +1,7 @@
 ﻿import alienistaParagraphs from './alienistaParagraphs.json';
 import domCasmurroParagraphs from './domCasmurroParagraphs.json';
+import memoriasSargentoParagraphs from './memoriasSargentoParagraphs.json';
+import homemJavanesParagraphs from './homemJavanesParagraphs.json';
 
 function splitIntoSentences(text) {
   const matches = text.match(/[^.!?]+[.!?]?/g);
@@ -129,7 +131,7 @@ export const stories = [
     titulo: 'O Alienista',
     autor: 'Machado de Assis',
     nivel: 'Avançada',
-    duracao: '85 min',
+    duracao: '95 min',
     descricao: 'Simão Bacamarte funda a Casa Verde em Itaguaí e transforma a cidade em laboratório sobre razão e loucura.',
     cover: '/capas/alienista-capa.jpg',
     paragrafos: alienistaParagraphs,
@@ -139,10 +141,30 @@ export const stories = [
     titulo: 'Dom Casmurro',
     autor: 'Machado de Assis',
     nivel: 'Avançada',
-    duracao: '220 min',
+    duracao: '360 min',
     descricao: 'Bentinho narra memórias de amor, ciúme e dúvida em um clássico da literatura brasileira.',
     cover: '/capas/dom-casmurro-capa.jpg',
     paragrafos: domCasmurroParagraphs,
+  },
+  {
+    id: 'memorias-de-um-sargento-de-milicias',
+    titulo: 'Memórias de um Sargento de Milícias',
+    autor: 'Manuel Antônio de Almeida',
+    nivel: 'Intermediária',
+    duracao: '330 min',
+    descricao: 'Com humor e crítica social, o romance acompanha as peripécias de Leonardo em um Rio de Janeiro oitocentista.',
+    cover: '/capas/memorias-sargento-capa.jpg',
+    paragrafos: memoriasSargentoParagraphs,
+  },
+  {
+    id: 'o-homem-que-sabia-javanes',
+    titulo: 'O Homem que Sabia Javanês',
+    autor: 'Lima Barreto',
+    nivel: 'Intermediária',
+    duracao: '18 min',
+    descricao: 'Um conto satírico sobre aparência de erudição, oportunismo e burocracia no Brasil.',
+    cover: '/capas/homem-javanes-capa.png',
+    paragrafos: homemJavanesParagraphs,
   },
 ].map(withTimedData);
 
