@@ -477,6 +477,18 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
       setStatus('playing');
       onPlayStateChange?.(true);
       speech.resume();
+
+      window.setTimeout(() => {
+        if (!speech.speaking) {
+          restartFromIndex(currentWordIndexRef.current);
+          return;
+        }
+
+        if (speech.paused) {
+          speech.cancel();
+          restartFromIndex(currentWordIndexRef.current);
+        }
+      }, 140);
       return;
     }
 
@@ -495,7 +507,7 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
     setStatus('playing');
     onPlayStateChange?.(true);
     startSpeech(seekWordIndex, { pauseAfterStart: false });
-  }, [canUse, onPlayStateChange, onPlaybackIntent, seekWordIndex, startSpeech, supported]);
+  }, [canUse, onPlayStateChange, onPlaybackIntent, restartFromIndex, seekWordIndex, startSpeech, supported]);
 
   const handlePause = useCallback(() => {
     if (!supported || typeof window === 'undefined') return;
@@ -513,9 +525,13 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
       speech.pause();
       window.setTimeout(() => {
         if (speech.speaking && !speech.paused) {
-          speech.pause();
+          speech.cancel();
+          pauseAfterStartRef.current = true;
+          setStatus('paused');
+          onPlayStateChange?.(false);
+          onPlaybackIntent?.(false);
         }
-      }, 45);
+      }, 140);
       return;
     }
 
@@ -525,14 +541,13 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
   }, [onPlayStateChange, onPlaybackIntent, supported]);
 
   const togglePlayback = useCallback(() => {
-    const runtimeState = getRuntimePlaybackState();
-    if (runtimeState === 'playing') {
+    if (status === 'playing') {
       handlePause();
       return;
     }
 
     handlePlay();
-  }, [getRuntimePlaybackState, handlePause, handlePlay]);
+  }, [handlePause, handlePlay, status]);
 
   const handleJump = useCallback(
     (step) => {

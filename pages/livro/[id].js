@@ -174,7 +174,7 @@ export default function LeituraPage() {
   }, [guidedPlaying]);
 
   const totalWords = story?.palavras?.length ?? 1;
-  const pageTitle = story ? `${story.titulo} | Leia\u00ca` : 'Leitura | Leia\u00ca';
+  const pageTitle = story ? `${story.titulo} | LeiaÊ` : 'Leitura | LeiaÊ';
 
   const roboticVoiceActive = voiceMode === 'robotic';
   const showSidePanel = !controlsCollapsed;
@@ -355,7 +355,7 @@ export default function LeituraPage() {
         await document.exitFullscreen?.();
       }
     } catch (_error) {
-      // Ignora erro de permiss\u00e3o/ambiente.
+      // Ignora erro de permissão/ambiente.
     }
   };
 
@@ -444,13 +444,13 @@ export default function LeituraPage() {
       <>
         <Head>
           <meta charSet='UTF-8' />
-          <title>Leitura | Leia\u00ca</title>
-          <meta name='description' content='Tela de leitura acess\u00edvel do Leia\u00ca.' />
+          <title>Leitura | LeiaÊ</title>
+          <meta name='description' content='Tela de leitura acessível do LeiaÊ.' />
         </Head>
 
         <main className='flex min-h-screen items-center justify-center bg-leiae-bg px-6 text-center text-leiae-dark'>
           <div>
-            <p className='text-xl font-semibold'>Hist\u00f3ria n\u00e3o encontrada.</p>
+            <p className='text-xl font-semibold'>História não encontrada.</p>
             <Link href='/biblioteca' className='mt-5 inline-flex rounded-xl bg-leiae-accent px-5 py-3 font-bold text-leiae-bg'>
               Voltar para biblioteca
             </Link>
@@ -473,11 +473,11 @@ export default function LeituraPage() {
       <Head>
         <meta charSet='UTF-8' />
         <title>{pageTitle}</title>
-        <meta name='description' content={`Leitura da hist\u00f3ria ${story.titulo} no Leia\u00ca.`} />
+        <meta name='description' content={`Leitura da história ${story.titulo} no LeiaÊ.`} />
       </Head>
 
       <AppShell
-        title='Leia\u00ca'
+        title='LeiaÊ'
         subtitle='Modo leitura'
         activeTab='leitura'
         darkHeader
@@ -558,8 +558,8 @@ export default function LeituraPage() {
                       onClick={() => handleQuickJump(3)}
                       disabled={quickDisabled}
                       className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
-                      aria-label='Avan\u00e7ar 3 palavras'
-                      title='Avan\u00e7ar 3 palavras'
+                      aria-label='Avançar 3 palavras'
+                      title='Avançar 3 palavras'
                     >
                       <QuickForwardIcon />
                     </button>
@@ -691,7 +691,7 @@ export default function LeituraPage() {
                   />
                 ) : (
                   <div className='rounded-2xl border border-leiae-dark/10 bg-white/80 px-3 py-2 text-center text-xs font-semibold text-leiae-dark/75'>
-                    Leitura humanizada ainda n\u00e3o dispon\u00edvel.
+                    Leitura humanizada ainda não disponível.
                   </div>
                 )}
               </div>
