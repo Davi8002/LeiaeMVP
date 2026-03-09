@@ -130,6 +130,22 @@ function estimateCharRate(rate, learnedRateAtOneX = 11.5) {
   const safeRate = clamp(Number(rate) || 1, 0.6, 2);
   return Math.max(4.5, baseline * safeRate);
 }
+function getTokenPauseHoldSeconds(token, rate = 1) {
+  const value = String(token || '');
+  const strongBreak = /[.!?…]+[)"'\]»”]*$/.test(value);
+  const mediumBreak = /[,;:]+[)"'\]»”]*$/.test(value);
+  const safeRate = Math.max(Number(rate) || 1, 0.1);
+
+  if (strongBreak) {
+    return 0.34 / safeRate;
+  }
+
+  if (mediumBreak) {
+    return 0.18 / safeRate;
+  }
+
+  return 0;
+}
 function scoreVoice(voice, normalizedGender) {
   const normalizedName = normalizeString(voice?.name);
   const normalizedLang = normalizeString(voice?.lang);
@@ -320,20 +336,16 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
   const emitWord = useCallback(
     (index, options = {}) => {
       const bounded = clamp(index, 0, maxIndex);
-      const visualIndex = isMobileSync
-        ? (chunkModel.chunkStartByWord[bounded] ?? bounded)
-        : bounded;
-
       currentWordIndexRef.current = bounded;
       setCurrentWordIndex(bounded);
 
       if (options.syncSeek) {
-        setSeekWordIndex(visualIndex);
+        setSeekWordIndex(bounded);
       }
 
-      onWordBoundary?.(visualIndex);
+      onWordBoundary?.(bounded);
     },
-    [chunkModel, isMobileSync, maxIndex, onWordBoundary],
+    [maxIndex, onWordBoundary],
   );
 
   const getRuntimePlaybackState = useCallback(() => {
@@ -544,11 +556,12 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
 
         const localWordIndex = getLocalWordIndexByChar(segmentWordsRef.current, boundedCharIndex);
         const globalWordIndex = clamp(segmentStartRef.current + localWordIndex, 0, maxIndex);
+        const stableWordIndex = Math.max(currentWordIndexRef.current, globalWordIndex);
 
-        playbackBaseSecondsRef.current = getWordStartSeconds(normalizedWords[globalWordIndex], globalWordIndex);
+        playbackBaseSecondsRef.current = getWordStartSeconds(normalizedWords[stableWordIndex], stableWordIndex);
         playbackStartMsRef.current = now;
 
-        emitWord(globalWordIndex, { syncSeek: true });
+        emitWord(stableWordIndex, { syncSeek: true });
       };
 
       utterance.onpause = () => {
@@ -947,12 +960,20 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
         const anchorTime = lastBoundaryAtMsRef.current || playbackStartMsRef.current || now;
         const anchorChar = lastBoundaryCharIndexRef.current || 0;
         const deltaSeconds = Math.max(0, (now - anchorTime) / 1000);
+        const anchorWordIndex = clamp(
+          currentWordIndexRef.current,
+          segmentStartRef.current,
+          Math.max(segmentEndRef.current, segmentStartRef.current),
+        );
+        const anchorToken = normalizedWords[anchorWordIndex]?.texto || '';
+        const punctuationHold = isMobileSync ? 0 : getTokenPauseHoldSeconds(anchorToken, playbackRateRef.current);
+        const effectiveDeltaSeconds = Math.max(0, deltaSeconds - punctuationHold);
         const charRate = currentCharRateRef.current > 0
           ? currentCharRateRef.current
           : estimateCharRate(playbackRateRef.current, learnedCharRateAtOneXRef.current);
 
         const estimatedChar = clamp(
-          Math.floor(anchorChar + (charRate * deltaSeconds)),
+          Math.floor(anchorChar + (charRate * effectiveDeltaSeconds)),
           0,
           Math.max(segmentTextLengthRef.current - 1, 0),
         );
@@ -992,7 +1013,7 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [canUse, emitWord, isPlaying, normalizedWords, totalWords]);
+  }, [canUse, emitWord, isMobileSync, isPlaying, normalizedWords, totalWords]);
 
   useEffect(() => {
     if (!externalAction?.id) return;
@@ -1230,6 +1251,7 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
 });
 
 export default SpeechSynthesisPlayer;
+
 
 
 

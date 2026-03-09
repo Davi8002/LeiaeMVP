@@ -70,8 +70,14 @@ export default function GuidedReadingText({
     });
   }, [centerOnWordToken]);
 
-  const activeWordClass = highContrast ? 'bg-leiae-accent text-leiae-bg' : 'bg-leiae-accent text-leiae-bg';
-  const activeChunkClass = highContrast ? 'bg-leiae-accent/45 text-leiae-bg' : 'bg-leiae-accent/22 text-leiae-text';
+  const activeWordClass = highContrast
+    ? 'bg-leiae-accent text-leiae-bg shadow-[inset_0_0_0_1px_rgba(247,237,225,0.24)]'
+    : 'bg-leiae-accent text-leiae-bg shadow-[inset_0_0_0_1px_rgba(39,21,12,0.08)]';
+
+  const activeChunkClass = highContrast
+    ? 'bg-leiae-accent text-leiae-bg shadow-[inset_0_0_0_1px_rgba(247,237,225,0.24)]'
+    : 'bg-leiae-accent/35 text-leiae-dark shadow-[inset_0_0_0_1px_rgba(39,21,12,0.08)]';
+
   const storyId = story?.id || 'story';
 
   return (
@@ -93,7 +99,7 @@ export default function GuidedReadingText({
               <span key={`${storyId}-word-${palavra.indice}-${wordPosition}`}>
                 <span
                   ref={isAnchor ? activeWordRef : null}
-                  className={`inline-block scroll-mt-24 rounded-md px-[0.22em] py-[0.06em] leading-[1.45] transition-colors duration-150 ${
+                  className={`inline-block scroll-mt-24 rounded-md px-[0.22em] py-[0.06em] leading-[1.45] box-decoration-clone transition-colors duration-150 ${
                     isActive ? activeClass : ''
                   }`}
                 >

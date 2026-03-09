@@ -256,7 +256,7 @@ export default function LeituraPage() {
       setGuidedPlaying(false);
     }
 
-    if (previous.isPaused && nextStatus.isPlaying) {
+    if (!previous.isPlaying && nextStatus.isPlaying) {
       setCenterOnWordToken((previousToken) => previousToken + 1);
     }
   }, []);
@@ -837,6 +837,7 @@ export default function LeituraPage() {
     </>
   );
 }
+
 
 
 

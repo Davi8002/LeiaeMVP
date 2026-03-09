@@ -64,7 +64,7 @@ export default function AppShell({
   );
 
   return (
-    <main className='min-h-screen bg-grainWarm px-0 py-0 sm:px-4 sm:py-4 lg:px-8 lg:py-6'>
+    <main lang='pt-BR' translate='no' className='min-h-screen bg-grainWarm px-0 py-0 sm:px-4 sm:py-4 lg:px-8 lg:py-6'>
       <div
         className={`relative mx-auto flex min-h-screen w-full ${maxWidthClass} flex-col overflow-hidden border border-leiae-dark/15 bg-leiae-bg shadow-app sm:min-h-[calc(100vh-2rem)] sm:rounded-app`}
       >
@@ -145,4 +145,5 @@ export default function AppShell({
     </main>
   );
 }
+
 
