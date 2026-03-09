@@ -1,4 +1,5 @@
 ﻿import alienistaParagraphs from './alienistaParagraphs.json';
+import domCasmurroParagraphs from './domCasmurroParagraphs.json';
 
 function splitIntoSentences(text) {
   const matches = text.match(/[^.!?]+[.!?]?/g);
@@ -133,9 +134,18 @@ export const stories = [
     cover: '/capas/alienista-capa.jpg',
     paragrafos: alienistaParagraphs,
   },
+  {
+    id: 'dom-casmurro',
+    titulo: 'Dom Casmurro',
+    autor: 'Machado de Assis',
+    nivel: 'Avançada',
+    duracao: '220 min',
+    descricao: 'Bentinho narra memórias de amor, ciúme e dúvida em um clássico da literatura brasileira.',
+    cover: '/capas/dom-casmurro-capa.jpg',
+    paragrafos: domCasmurroParagraphs,
+  },
 ].map(withTimedData);
 
 export function getStoryById(id) {
   return stories.find((story) => story.id === id);
 }
-
