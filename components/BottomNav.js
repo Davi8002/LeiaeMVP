@@ -1,7 +1,7 @@
-﻿import Link from 'next/link';
+import Link from 'next/link';
 
 const tabs = [
-  { id: 'home', label: 'Início', href: '/' },
+  { id: 'home', label: 'In\u00edcio', href: '/' },
   { id: 'biblioteca', label: 'Biblioteca', href: '/biblioteca' },
   { id: 'leitura', label: 'Leitura', href: '/biblioteca' },
   { id: 'config', label: 'Ajustes', href: '/ajustes' },
@@ -45,8 +45,11 @@ function Icon({ type }) {
 
 export default function BottomNav({ active = 'home', readingHref = '/biblioteca' }) {
   return (
-    <nav className='absolute bottom-0 left-0 right-0 border-t border-leiae-dark/10 bg-leiae-paper/95 px-4 pb-5 pt-3 backdrop-blur'>
-      <ul className='grid grid-cols-4 gap-1'>
+    <nav
+      translate='no'
+      className='absolute bottom-0 left-0 right-0 z-40 isolate overflow-hidden border-t border-leiae-dark/10 bg-leiae-paper px-4 pb-5 pt-3 supports-[backdrop-filter]:bg-leiae-paper/95 supports-[backdrop-filter]:backdrop-blur'
+    >
+      <ul className='grid grid-cols-4 gap-1.5'>
         {tabs.map((item) => {
           const href = item.id === 'leitura' ? readingHref : item.href;
           const activeItem = item.id === active;
@@ -55,7 +58,7 @@ export default function BottomNav({ active = 'home', readingHref = '/biblioteca'
             <li key={item.id}>
               <Link
                 href={href}
-                className={`flex flex-col items-center gap-1 rounded-xl px-1 py-1 text-xs font-semibold transition ${
+                className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1 text-xs font-semibold transition [touch-action:manipulation] ${
                   activeItem ? 'text-leiae-accent' : 'text-leiae-dark/70 hover:text-leiae-dark'
                 }`}
               >
@@ -66,7 +69,7 @@ export default function BottomNav({ active = 'home', readingHref = '/biblioteca'
                 >
                   <Icon type={item.id} />
                 </span>
-                {item.label}
+                <span className='w-full truncate whitespace-nowrap text-center leading-tight'>{item.label}</span>
               </Link>
             </li>
           );

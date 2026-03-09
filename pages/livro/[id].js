@@ -111,7 +111,7 @@ function buildPageRanges(words) {
     if (!isLastChunk) {
       const searchStart = Math.max(start + minWordsPerPage - 1, start);
       for (let i = end; i >= searchStart; i -= 1) {
-        if (/[.!?…]$/.test(words[i].texto)) {
+        if (/[.!?\u2026]$/.test(words[i].texto)) {
           end = i;
           break;
         }
@@ -176,7 +176,7 @@ export default function LeituraPage() {
   }, [guidedPlaying]);
 
   const totalWords = story?.palavras?.length ?? 1;
-  const pageTitle = story ? `${story.titulo} | LeiaÊ` : 'Leitura | LeiaÊ';
+  const pageTitle = story ? `${story.titulo} | Leia\u00ca` : 'Leitura | Leia\u00ca';
 
   const roboticVoiceActive = voiceMode === 'robotic';
   const showSidePanel = !controlsCollapsed;
@@ -336,7 +336,7 @@ export default function LeituraPage() {
         await document.exitFullscreen?.();
       }
     } catch (_error) {
-      // Ignora erro de permissão/ambiente.
+      // Ignora erro de permiss\u00e3o/ambiente.
     }
   };
 
@@ -391,7 +391,7 @@ export default function LeituraPage() {
     setGuidedSpeed((previous) => Number(Math.max(0.5, previous - 0.25).toFixed(2)));
   };
 
-  const quickDisabled = !roboticVoiceActive || !speechStatus.supported;
+  const quickDisabled = !roboticVoiceActive || !speechStatus.canUse;
 
   const handleQuickJump = (step) => {
     if (quickDisabled) return;
@@ -435,13 +435,13 @@ export default function LeituraPage() {
       <>
         <Head>
           <meta charSet='UTF-8' />
-          <title>Leitura | LeiaÊ</title>
-          <meta name='description' content='Tela de leitura acessível do LeiaÊ.' />
+          <title>Leitura | Leia\u00ca</title>
+          <meta name='description' content='Tela de leitura acess\u00edvel do Leia\u00ca.' />
         </Head>
 
         <main className='flex min-h-screen items-center justify-center bg-leiae-bg px-6 text-center text-leiae-dark'>
           <div>
-            <p className='text-xl font-semibold'>História não encontrada.</p>
+            <p className='text-xl font-semibold'>Hist\u00f3ria n\u00e3o encontrada.</p>
             <Link href='/biblioteca' className='mt-5 inline-flex rounded-xl bg-leiae-accent px-5 py-3 font-bold text-leiae-bg'>
               Voltar para biblioteca
             </Link>
@@ -464,11 +464,11 @@ export default function LeituraPage() {
       <Head>
         <meta charSet='UTF-8' />
         <title>{pageTitle}</title>
-        <meta name='description' content={`Leitura da história ${story.titulo} no LeiaÊ.`} />
+        <meta name='description' content={`Leitura da hist\u00f3ria ${story.titulo} no Leia\u00ca.`} />
       </Head>
 
       <AppShell
-        title='LeiaÊ'
+        title='Leia\u00ca'
         subtitle='Modo leitura'
         activeTab='leitura'
         darkHeader
@@ -528,7 +528,7 @@ export default function LeituraPage() {
                       type='button'
                       onClick={() => handleQuickJump(-3)}
                       disabled={quickDisabled}
-                      className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+                      className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
                       aria-label='Voltar 3 palavras'
                       title='Voltar 3 palavras'
                     >
@@ -538,7 +538,7 @@ export default function LeituraPage() {
                       type='button'
                       onClick={handleQuickToggle}
                       disabled={quickDisabled}
-                      className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg transition hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-45'
+                      className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg transition hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
                       aria-label={speechStatus.isPlaying ? 'Pausar leitura' : 'Retomar leitura'}
                       title={speechStatus.isPlaying ? 'Pausar leitura' : 'Retomar leitura'}
                     >
@@ -548,9 +548,9 @@ export default function LeituraPage() {
                       type='button'
                       onClick={() => handleQuickJump(3)}
                       disabled={quickDisabled}
-                      className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-                      aria-label='Avançar 3 palavras'
-                      title='Avançar 3 palavras'
+                      className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
+                      aria-label='Avan\u00e7ar 3 palavras'
+                      title='Avan\u00e7ar 3 palavras'
                     >
                       <QuickForwardIcon />
                     </button>
@@ -580,22 +580,22 @@ export default function LeituraPage() {
                     type='button'
                     onClick={() => navigatePage(-1)}
                     disabled={currentPageIndex <= 0}
-                    className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-                    aria-label='Página anterior'
+                    className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
+                    aria-label='P\u00e1gina anterior'
                   >
                     <ArrowIcon direction='left' />
                   </button>
 
                   <span className='rounded-full bg-leiae-dark/10 px-3 py-1 text-xs font-semibold text-leiae-dark/75'>
-                    Página {currentPageIndex + 1}/{pageRanges.length}
+                    P\u00e1gina {currentPageIndex + 1}/{pageRanges.length}
                   </span>
 
                   <button
                     type='button'
                     onClick={() => navigatePage(1)}
                     disabled={currentPageIndex >= pageRanges.length - 1}
-                    className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
-                    aria-label='Próxima página'
+                    className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
+                    aria-label='Pr\u00f3xima p\u00e1gina'
                   >
                     <ArrowIcon direction='right' />
                   </button>
@@ -613,7 +613,7 @@ export default function LeituraPage() {
               <button
                 type='button'
                 onClick={() => setControlsCollapsed((previous) => !previous)}
-                className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg'
+                className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg [touch-action:manipulation]'
                 aria-label={showSidePanel ? 'Recolher painel lateral' : 'Expandir painel lateral'}
               >
                 <PanelToggleIcon collapsed={!showSidePanel} />
@@ -637,7 +637,7 @@ export default function LeituraPage() {
                     <button
                       type='button'
                       onClick={() => setHideBottomPanelMobile(true)}
-                      className='rounded-full border border-leiae-dark/20 bg-white px-2.5 py-1 text-xs font-semibold text-leiae-dark transition hover:bg-leiae-bg md:hidden'
+                      className='rounded-full border border-leiae-dark/20 bg-white px-2.5 py-1 text-xs font-semibold text-leiae-dark transition hover:bg-leiae-bg [touch-action:manipulation] md:hidden'
                     >
                       Ocultar painel
                     </button>
@@ -660,7 +660,7 @@ export default function LeituraPage() {
                   <button
                     type='button'
                     disabled
-                    className='rounded-full border border-leiae-dark/20 bg-white/70 px-3 py-1.5 text-xs font-semibold text-leiae-dark/65'
+                    className='rounded-full border border-leiae-dark/20 bg-white/70 px-3 py-1.5 text-xs font-semibold text-leiae-dark/65 [touch-action:manipulation]'
                   >
                     Humanizada (em breve)
                   </button>
@@ -681,7 +681,7 @@ export default function LeituraPage() {
                   />
                 ) : (
                   <div className='rounded-2xl border border-leiae-dark/10 bg-white/80 px-3 py-2 text-center text-xs font-semibold text-leiae-dark/75'>
-                    Leitura humanizada ainda não disponível.
+                    Leitura humanizada ainda n\u00e3o dispon\u00edvel.
                   </div>
                 )}
               </div>
@@ -689,7 +689,7 @@ export default function LeituraPage() {
               <button
                 type='button'
                 onClick={toggleFullscreen}
-                className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg'
+                className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg [touch-action:manipulation]'
                 aria-label={isFullscreen ? 'Sair da tela cheia' : 'Ativar tela cheia'}
               >
                 <FullscreenIcon active={isFullscreen} />
@@ -701,7 +701,7 @@ export default function LeituraPage() {
             <button
               type='button'
               onClick={() => setHideBottomPanelMobile(false)}
-              className='fixed bottom-4 right-4 z-40 rounded-full bg-leiae-accent px-4 py-2 text-xs font-semibold text-leiae-bg shadow-lg transition hover:bg-leiae-dark md:hidden'
+              className='fixed bottom-4 right-4 z-40 rounded-full bg-leiae-accent px-4 py-2 text-xs font-semibold text-leiae-bg shadow-lg transition hover:bg-leiae-dark [touch-action:manipulation] md:hidden'
             >
               Mostrar controles
             </button>

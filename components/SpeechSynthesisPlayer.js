@@ -407,7 +407,7 @@ export default function SpeechSynthesisPlayer({
         pauseAfterStartRef.current = false;
         userPausedRef.current = false;
         setStatus('idle');
-        setSpeechError('Não foi possível reproduzir a voz automática neste navegador.');
+        setSpeechError('N\u00e3o foi poss\u00edvel reproduzir a voz autom\u00e1tica neste navegador.');
         onPlayStateChange?.(false);
       };
 
@@ -699,9 +699,13 @@ export default function SpeechSynthesisPlayer({
       if (next !== previous) {
         onRateChange?.(next);
 
-        if (isPlaying) {
+        const speech = typeof window !== 'undefined' ? window.speechSynthesis : null;
+        const runtimePlaying = Boolean(speech && speech.speaking && !speech.paused);
+        const runtimePaused = Boolean(speech && speech.speaking && speech.paused);
+
+        if (isPlaying || runtimePlaying) {
           restartFromIndex(currentWordIndexRef.current, { rateOverride: next });
-        } else if (isPaused) {
+        } else if (isPaused || runtimePaused) {
           restartFromIndex(currentWordIndexRef.current, { keepPaused: true, rateOverride: next });
         }
       }
@@ -745,7 +749,7 @@ export default function SpeechSynthesisPlayer({
   if (!supported) {
     return (
       <section className='rounded-3xl border border-leiae-dark/10 bg-leiae-paper p-4 shadow-card'>
-        <p className='text-sm font-semibold text-leiae-dark/80'>Leitura em voz do navegador não suportada neste dispositivo.</p>
+        <p className='text-sm font-semibold text-leiae-dark/80'>Leitura em voz do navegador n\u00e3o suportada neste dispositivo.</p>
       </section>
     );
   }
@@ -757,7 +761,7 @@ export default function SpeechSynthesisPlayer({
           type='button'
           onClick={() => handleJump(-8)}
           disabled={!canUse}
-          className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 sm:h-11 sm:w-11'
+          className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation] sm:h-11 sm:w-11'
           aria-label='Voltar leitura'
         >
           <BackwardIcon />
@@ -767,8 +771,8 @@ export default function SpeechSynthesisPlayer({
           type='button'
           onClick={isPlaying ? handlePause : handlePlay}
           disabled={!canUse}
-          className='inline-flex h-12 w-12 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg shadow transition-all duration-200 hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:w-14'
-          aria-label={isPlaying ? 'Pausar leitura automática' : 'Iniciar leitura automática'}
+          className='inline-flex h-12 w-12 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg shadow transition-all duration-200 hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-50 [touch-action:manipulation] sm:h-14 sm:w-14'
+          aria-label={isPlaying ? 'Pausar leitura autom\u00e1tica' : 'Iniciar leitura autom\u00e1tica'}
         >
           {isPlaying ? <PauseIcon /> : <PlayIcon />}
         </button>
@@ -777,8 +781,8 @@ export default function SpeechSynthesisPlayer({
           type='button'
           onClick={() => handleJump(8)}
           disabled={!canUse}
-          className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 sm:h-11 sm:w-11'
-          aria-label='Avançar leitura'
+          className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation] sm:h-11 sm:w-11'
+          aria-label='Avan\u00e7ar leitura'
         >
           <ForwardIcon />
         </button>
@@ -798,8 +802,12 @@ export default function SpeechSynthesisPlayer({
           onChange={handleSeekChange}
           onMouseDown={beginSeek}
           onTouchStart={beginSeek}
+          onPointerDown={beginSeek}
           onMouseUp={() => applySeek()}
           onTouchEnd={() => applySeek()}
+          onPointerUp={() => applySeek()}
+          onTouchCancel={() => applySeek(true)}
+          onPointerCancel={() => applySeek(true)}
           onBlur={() => applySeek(true)}
           onKeyUp={(event) => {
             if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
@@ -820,7 +828,7 @@ export default function SpeechSynthesisPlayer({
             type='button'
             onClick={() => handleRate(-0.1)}
             disabled={voiceRate <= 0.6}
-            className='rounded-full border border-leiae-dark/20 px-3 py-1.5 text-sm font-semibold text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+            className='rounded-full border border-leiae-dark/20 px-3 py-1.5 text-sm font-semibold text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
           >
             Velocidade -
           </button>
@@ -828,7 +836,7 @@ export default function SpeechSynthesisPlayer({
             type='button'
             onClick={() => handleRate(0.1)}
             disabled={voiceRate >= 2}
-            className='rounded-full border border-leiae-dark/20 px-3 py-1.5 text-sm font-semibold text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45'
+            className='rounded-full border border-leiae-dark/20 px-3 py-1.5 text-sm font-semibold text-leiae-dark transition-all duration-200 hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
           >
             Velocidade +
           </button>
@@ -836,7 +844,7 @@ export default function SpeechSynthesisPlayer({
             {voiceRate.toFixed(1)}x
           </span>
           {isSeeking ? (
-            <span className='rounded-full bg-leiae-accent/15 px-3 py-1 text-xs font-semibold text-leiae-dark'>Ajustando posição...</span>
+            <span className='rounded-full bg-leiae-accent/15 px-3 py-1 text-xs font-semibold text-leiae-dark'>Ajustando posi\u00e7\u00e3o...</span>
           ) : null}
         </div>
       </div>
@@ -856,7 +864,7 @@ export default function SpeechSynthesisPlayer({
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div>
           <h2 className='font-display text-lg font-bold text-leiae-dark'>Player de leitura robotizada</h2>
-          <p className='text-sm text-leiae-text/75'>Controle a leitura como em um player de áudio/vídeo</p>
+          <p className='text-sm text-leiae-text/75'>Controle a leitura como em um player de \u00e1udio/v\u00eddeo</p>
         </div>
 
         <span className='inline-flex items-center gap-2 rounded-full border border-leiae-dark/10 bg-white/80 px-3 py-1 text-xs font-semibold text-leiae-dark/80'>

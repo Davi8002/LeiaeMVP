@@ -1,4 +1,4 @@
-﻿import Link from 'next/link';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { buildLastReadingHref } from '../data/readingSession';
 import Logo from './Logo';
@@ -14,8 +14,8 @@ function BackArrow() {
 
 export default function AppShell({
   children,
-  title = 'LeiaÊ',
-  subtitle = 'Leitura acessível',
+  title = 'Leia\u00ca',
+  subtitle = 'Leitura acess\u00edvel',
   activeTab = 'home',
   darkHeader = true,
   showTopNav = true,
@@ -36,7 +36,7 @@ export default function AppShell({
 
   const tabs = useMemo(
     () => [
-      { id: 'home', label: 'Início', href: '/' },
+      { id: 'home', label: 'In\u00edcio', href: '/' },
       { id: 'biblioteca', label: 'Biblioteca', href: '/biblioteca' },
       { id: 'leitura', label: 'Leitura', href: resolvedReadingHref },
       { id: 'config', label: 'Ajustes', href: '/ajustes' },
@@ -115,7 +115,7 @@ export default function AppShell({
           ) : null}
         </header>
 
-        <section className='relative flex-1 overflow-y-auto px-4 pb-28 pt-5 sm:px-6 md:pb-10 lg:px-8 xl:px-10'>{children}</section>
+        <section className='relative flex-1 overflow-y-auto px-4 pb-28 pt-5 [overscroll-behavior-y:contain] sm:px-6 md:pb-10 lg:px-8 xl:px-10' style={{ WebkitOverflowScrolling: 'touch' }}>{children}</section>
 
         {showBottomNav ? (
           <div className='md:hidden'>

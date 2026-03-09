@@ -1,4 +1,4 @@
-﻿import Image from 'next/image';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -17,7 +17,7 @@ export default function StoryCard({ story }) {
   const [coverError, setCoverError] = useState(false);
 
   return (
-    <article className='group overflow-hidden rounded-2xl border border-leiae-dark/10 bg-leiae-paper shadow-card transition hover:-translate-y-1 hover:shadow-warm'>
+    <article className='group flex h-full flex-col overflow-hidden rounded-2xl border border-leiae-dark/10 bg-leiae-paper shadow-card transition hover:-translate-y-1 hover:shadow-warm'>
       <div className='relative aspect-[11/18] overflow-hidden border-b border-leiae-dark/10'>
         {!coverError && story.cover ? (
           <Image
@@ -37,17 +37,21 @@ export default function StoryCard({ story }) {
         </div>
       </div>
 
-      <div className='p-3 sm:p-4'>
+      <div className='flex flex-1 flex-col p-3 sm:p-4'>
         <div className='mb-2 inline-flex rounded-full bg-leiae-dark/10 px-2 py-1 text-[10px] font-semibold text-leiae-dark/80 sm:px-3 sm:text-xs'>
           {story.duracao} de leitura
         </div>
 
-        <h2 className='font-display text-base leading-tight text-leiae-dark sm:text-2xl'>{story.titulo}</h2>
-        <p className='mt-2 text-xs text-leiae-text/90 sm:text-sm'>{story.descricao}</p>
+        <h2 className='h-[2.6rem] overflow-hidden font-display text-[0.95rem] leading-tight text-leiae-dark sm:h-[3rem] sm:text-xl'>
+          {story.titulo}
+        </h2>
+        <p className='mt-2 h-[3.9rem] overflow-hidden text-[11px] leading-[1.3rem] text-leiae-text/90 sm:h-[4.4rem] sm:text-sm sm:leading-[1.45rem]'>
+          {story.descricao}
+        </p>
 
         <Link
           href={`/livro/${story.id}`}
-          className='mt-3 inline-flex w-full items-center justify-center rounded-full bg-leiae-accent px-3 py-2 text-xs font-bold text-leiae-bg transition hover:bg-leiae-dark sm:mt-4 sm:w-auto sm:px-5 sm:py-2.5 sm:text-sm'
+          className='mt-auto inline-flex w-full items-center justify-center rounded-full bg-leiae-accent px-3 py-2 text-xs font-bold text-leiae-bg transition [touch-action:manipulation] hover:bg-leiae-dark sm:mt-4 sm:w-auto sm:px-5 sm:py-2.5 sm:text-sm'
         >
           Ler agora
         </Link>
