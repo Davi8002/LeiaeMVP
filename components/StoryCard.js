@@ -1,4 +1,4 @@
-import Image from 'next/image';
+﻿import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -45,6 +45,7 @@ export default function StoryCard({ story }) {
         <h2 className='h-[2.6rem] overflow-hidden font-display text-[0.95rem] leading-tight text-leiae-dark sm:h-[3rem] sm:text-xl'>
           {story.titulo}
         </h2>
+        <p className='mt-1 text-[11px] font-semibold text-leiae-dark/75 sm:text-sm'>{story.autor}</p>
         <p className='mt-2 h-[3.9rem] overflow-hidden text-[11px] leading-[1.3rem] text-leiae-text/90 sm:h-[4.4rem] sm:text-sm sm:leading-[1.45rem]'>
           {story.descricao}
         </p>

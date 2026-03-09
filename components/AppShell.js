@@ -1,6 +1,7 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { buildLastReadingHref } from '../data/readingSession';
+import { getStoryById } from '../data/stories';
 import Logo from './Logo';
 import BottomNav from './BottomNav';
 
@@ -14,8 +15,8 @@ function BackArrow() {
 
 export default function AppShell({
   children,
-  title = 'LeiaÊ',
-  subtitle = 'Leitura acessível',
+  title = 'LeiaÃŠ',
+  subtitle = 'Leitura acessÃ­vel',
   activeTab = 'home',
   darkHeader = true,
   showTopNav = true,
@@ -29,14 +30,32 @@ export default function AppShell({
   useEffect(() => {
     const isSpecificReading = readingHref.startsWith('/livro/');
     const fallback = isSpecificReading ? readingHref : '/biblioteca';
-    const nextHref = isSpecificReading ? readingHref : buildLastReadingHref(fallback);
 
-    setResolvedReadingHref(nextHref);
+    if (isSpecificReading) {
+      setResolvedReadingHref(readingHref);
+      return;
+    }
+
+    const sessionHref = buildLastReadingHref(fallback);
+    const match = sessionHref.match(/^\/livro\/([^?]+)/);
+
+    if (!match) {
+      setResolvedReadingHref(sessionHref);
+      return;
+    }
+
+    const storyId = decodeURIComponent(match[1]);
+    if (!getStoryById(storyId)) {
+      setResolvedReadingHref(fallback);
+      return;
+    }
+
+    setResolvedReadingHref(sessionHref);
   }, [readingHref]);
 
   const tabs = useMemo(
     () => [
-      { id: 'home', label: 'Início', href: '/' },
+      { id: 'home', label: 'InÃ­cio', href: '/' },
       { id: 'biblioteca', label: 'Biblioteca', href: '/biblioteca' },
       { id: 'leitura', label: 'Leitura', href: resolvedReadingHref },
       { id: 'config', label: 'Ajustes', href: '/ajustes' },

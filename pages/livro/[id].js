@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -168,13 +168,15 @@ export default function LeituraPage() {
     totalWords: 0,
     progressPercent: 0,
   });
+  const [pageInputValue, setPageInputValue] = useState('1');
+  const [pageValidationMessage, setPageValidationMessage] = useState('');
 
   useEffect(() => {
     guidedPlayingRef.current = guidedPlaying;
   }, [guidedPlaying]);
 
   const totalWords = story?.palavras?.length ?? 1;
-  const pageTitle = story ? `${story.titulo} | LeiaÊ` : 'Leitura | LeiaÊ';
+  const pageTitle = story ? `${story.titulo} | LeiaÃŠ` : 'Leitura | LeiaÃŠ';
 
   const roboticVoiceActive = voiceMode === 'robotic';
   const showSidePanel = !controlsCollapsed;
@@ -200,6 +202,10 @@ export default function LeituraPage() {
   }, [guidedWordIndex, pageRanges]);
 
   const currentPageRange = pageRanges[currentPageIndex] || pageRanges[0];
+
+  useEffect(() => {
+    setPageInputValue(String(currentPageIndex + 1));
+  }, [currentPageIndex]);
 
   const handleSpeechStatus = useCallback((nextStatus) => {
     const previous = speechStatusRef.current;
@@ -355,7 +361,7 @@ export default function LeituraPage() {
         await document.exitFullscreen?.();
       }
     } catch (_error) {
-      // Ignora erro de permissão/ambiente.
+      // Ignora erro de permissÃ£o/ambiente.
     }
   };
 
@@ -422,17 +428,55 @@ export default function LeituraPage() {
     toggleRobotPlayback();
   };
 
+  const goToPageIndex = useCallback(
+    (pageIndex) => {
+      if (!pageRanges.length) return false;
+
+      const nextPage = Math.max(0, Math.min(pageRanges.length - 1, pageIndex));
+      const targetIndex = pageRanges[nextPage].start;
+
+      setGuidedWordIndex(targetIndex);
+
+      if (roboticVoiceActive && (speechStatusRef.current.isPlaying || speechStatusRef.current.isPaused)) {
+        seekRobotWord(targetIndex);
+      }
+
+      return true;
+    },
+    [pageRanges, roboticVoiceActive, seekRobotWord],
+  );
+
   const navigatePage = (delta) => {
+    goToPageIndex(currentPageIndex + delta);
+  };
+
+  const navigateToTypedPage = () => {
     if (!pageRanges.length) return;
 
-    const nextPage = Math.max(0, Math.min(pageRanges.length - 1, currentPageIndex + delta));
-    const targetIndex = pageRanges[nextPage].start;
+    const rawValue = pageInputValue.trim();
+    const parsed = Number.parseInt(rawValue, 10);
 
-    setGuidedWordIndex(targetIndex);
-
-    if (roboticVoiceActive && (speechStatusRef.current.isPlaying || speechStatusRef.current.isPaused)) {
-      seekRobotWord(targetIndex);
+    if (!Number.isFinite(parsed)) {
+      setPageValidationMessage('Digite um número de página válido.');
+      setPageInputValue(String(currentPageIndex + 1));
+      return;
     }
+
+    const clamped = Math.max(1, Math.min(pageRanges.length, parsed));
+    goToPageIndex(clamped - 1);
+    setPageInputValue(String(clamped));
+
+    if (clamped !== parsed) {
+      setPageValidationMessage(`Página ajustada para ${clamped}.`);
+      return;
+    }
+
+    setPageValidationMessage('');
+  };
+
+  const handleTypedPageSubmit = (event) => {
+    event.preventDefault();
+    navigateToTypedPage();
   };
 
   if (!router.isReady) {
@@ -444,13 +488,13 @@ export default function LeituraPage() {
       <>
         <Head>
           <meta charSet='UTF-8' />
-          <title>Leitura | LeiaÊ</title>
-          <meta name='description' content='Tela de leitura acessível do LeiaÊ.' />
+          <title>Leitura | LeiaÃŠ</title>
+          <meta name='description' content='Tela de leitura acessÃ­vel do LeiaÃŠ.' />
         </Head>
 
         <main className='flex min-h-screen items-center justify-center bg-leiae-bg px-6 text-center text-leiae-dark'>
           <div>
-            <p className='text-xl font-semibold'>História não encontrada.</p>
+            <p className='text-xl font-semibold'>HistÃ³ria nÃ£o encontrada.</p>
             <Link href='/biblioteca' className='mt-5 inline-flex rounded-xl bg-leiae-accent px-5 py-3 font-bold text-leiae-bg'>
               Voltar para biblioteca
             </Link>
@@ -473,11 +517,11 @@ export default function LeituraPage() {
       <Head>
         <meta charSet='UTF-8' />
         <title>{pageTitle}</title>
-        <meta name='description' content={`Leitura da história ${story.titulo} no LeiaÊ.`} />
+        <meta name='description' content={`Leitura da histÃ³ria ${story.titulo} no LeiaÃŠ.`} />
       </Head>
 
       <AppShell
-        title='LeiaÊ'
+        title='LeiaÃŠ'
         subtitle='Modo leitura'
         activeTab='leitura'
         darkHeader
@@ -558,8 +602,8 @@ export default function LeituraPage() {
                       onClick={() => handleQuickJump(3)}
                       disabled={quickDisabled}
                       className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
-                      aria-label='Avançar 3 palavras'
-                      title='Avançar 3 palavras'
+                      aria-label='AvanÃ§ar 3 palavras'
+                      title='AvanÃ§ar 3 palavras'
                     >
                       <QuickForwardIcon />
                     </button>
@@ -584,7 +628,7 @@ export default function LeituraPage() {
               />
 
               <div className='mt-8 border-t border-leiae-dark/10 pt-4'>
-                <div className='flex items-center justify-center gap-3'>
+                <div className='flex flex-wrap items-center justify-center gap-3'>
                   <button
                     type='button'
                     onClick={() => navigatePage(-1)}
@@ -609,6 +653,36 @@ export default function LeituraPage() {
                     <ArrowIcon direction='right' />
                   </button>
                 </div>
+
+                <form onSubmit={handleTypedPageSubmit} className='mt-3 flex flex-wrap items-center justify-center gap-2'>
+                  <label htmlFor='page-jump' className='text-xs font-semibold text-leiae-dark/70'>
+                    Ir para
+                  </label>
+                  <input
+                    id='page-jump'
+                    type='number'
+                    inputMode='numeric'
+                    min={1}
+                    max={pageRanges.length}
+                    value={pageInputValue}
+                    onChange={(event) => {
+                      setPageInputValue(event.target.value);
+                      if (pageValidationMessage) setPageValidationMessage('');
+                    }}
+                    className='w-20 rounded-full border border-leiae-dark/20 bg-white px-3 py-1 text-center text-sm font-semibold text-leiae-dark outline-none transition focus:border-leiae-accent focus:ring-2 focus:ring-leiae-accent/20'
+                    aria-label='Número da página'
+                  />
+                  <button
+                    type='submit'
+                    className='rounded-full bg-leiae-accent px-3 py-1 text-xs font-semibold text-leiae-bg transition hover:bg-leiae-dark [touch-action:manipulation]'
+                  >
+                    Ir
+                  </button>
+                </form>
+
+                {pageValidationMessage ? (
+                  <p className='mt-2 text-center text-xs font-medium text-leiae-dark/70'>{pageValidationMessage}</p>
+                ) : null}
               </div>
             </article>
           </div>
@@ -691,7 +765,7 @@ export default function LeituraPage() {
                   />
                 ) : (
                   <div className='rounded-2xl border border-leiae-dark/10 bg-white/80 px-3 py-2 text-center text-xs font-semibold text-leiae-dark/75'>
-                    Leitura humanizada ainda não disponível.
+                    Leitura humanizada ainda nÃ£o disponÃ­vel.
                   </div>
                 )}
               </div>
@@ -721,3 +795,7 @@ export default function LeituraPage() {
     </>
   );
 }
+
+
+
+
