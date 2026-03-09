@@ -55,72 +55,6 @@ function findWordIndexByTimeline(words, timelineSeconds, minIndex = 0) {
   return words.length - 1;
 }
 
-function buildChunkModel(words) {
-  if (!Array.isArray(words) || words.length === 0) {
-    return {
-      ranges: [{ start: 0, end: 0 }],
-      chunkStartByWord: [0],
-      chunkIndexByWord: [0],
-    };
-  }
-
-  const ranges = [];
-  const chunkStartByWord = new Array(words.length);
-  const chunkIndexByWord = new Array(words.length);
-
-  let start = 0;
-
-  while (start < words.length) {
-    let end = start;
-    let count = 0;
-
-    for (let index = start; index < words.length; index += 1) {
-      const token = String(words[index]?.texto || '');
-      count += 1;
-      end = index;
-
-      const strongBreak = /[.!?…]+[)"'\]»”]*$/.test(token);
-      const mediumBreak = /[,;:]+[)"'\]»”]*$/.test(token);
-
-      const shouldBreak =
-        (count >= 6 && strongBreak) ||
-        (count >= 10 && mediumBreak) ||
-        count >= 16 ||
-        index === words.length - 1;
-
-      if (shouldBreak) {
-        break;
-      }
-    }
-
-    const chunkIndex = ranges.length;
-    ranges.push({ start, end });
-
-    for (let i = start; i <= end; i += 1) {
-      chunkStartByWord[i] = start;
-      chunkIndexByWord[i] = chunkIndex;
-    }
-
-    start = end + 1;
-  }
-
-  return {
-    ranges,
-    chunkStartByWord,
-    chunkIndexByWord,
-  };
-}
-
-function isMobileReadingEnvironment() {
-  if (typeof window === 'undefined') return false;
-
-  const ua = window.navigator?.userAgent || '';
-  const uaMobile = /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(ua);
-  const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
-  const narrowViewport = window.matchMedia?.('(max-width: 768px)')?.matches ?? false;
-
-  return uaMobile || (coarsePointer && narrowViewport);
-}
 
 function estimateCharRate(rate, learnedRateAtOneX = 11.5) {
   const baseline = Number.isFinite(learnedRateAtOneX) && learnedRateAtOneX > 0
@@ -137,11 +71,11 @@ function getTokenPauseHoldSeconds(token, rate = 1) {
   const safeRate = Math.max(Number(rate) || 1, 0.1);
 
   if (strongBreak) {
-    return 0.34 / safeRate;
+    return 0.48 / Math.max(safeRate, 0.9);
   }
 
   if (mediumBreak) {
-    return 0.18 / safeRate;
+    return 0.24 / Math.max(safeRate, 0.9);
   }
 
   return 0;
@@ -290,7 +224,6 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
   const [speechError, setSpeechError] = useState('');
   const [isSeeking, setIsSeeking] = useState(false);
   const [availableVoices, setAvailableVoices] = useState([]);
-  const [mobileEnvironment, setMobileEnvironment] = useState(false);
 
   const normalizedWords = useMemo(() => {
     if (Array.isArray(words) && words.length > 0) {
@@ -315,24 +248,10 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
     [availableVoices, voiceGender],
   );
 
-  const isMobileSync = mobileEnvironment;
-
-  const chunkModel = useMemo(
-    () => buildChunkModel(normalizedWords),
-    [normalizedWords],
-  );
-
   const activeRange = useMemo(() => {
     const bounded = clamp(currentWordIndex, 0, maxIndex);
-
-    if (!isMobileSync) {
-      return { start: bounded, end: bounded };
-    }
-
-    const chunkIndex = chunkModel.chunkIndexByWord[bounded] ?? 0;
-    return chunkModel.ranges[chunkIndex] || { start: bounded, end: bounded };
-  }, [chunkModel, currentWordIndex, isMobileSync, maxIndex]);
-
+    return { start: bounded, end: bounded };
+  }, [currentWordIndex, maxIndex]);
   const emitWord = useCallback(
     (index, options = {}) => {
       const bounded = clamp(index, 0, maxIndex);
@@ -840,23 +759,6 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
     setSupported(hasSupport);
   }, []);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-
-    const updateEnvironment = () => {
-      setMobileEnvironment(isMobileReadingEnvironment());
-    };
-
-    updateEnvironment();
-
-    window.addEventListener('resize', updateEnvironment);
-    window.addEventListener('orientationchange', updateEnvironment);
-
-    return () => {
-      window.removeEventListener('resize', updateEnvironment);
-      window.removeEventListener('orientationchange', updateEnvironment);
-    };
-  }, []);
 
   useEffect(() => {
     if (!supported || typeof window === 'undefined') return undefined;
@@ -966,39 +868,49 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
           Math.max(segmentEndRef.current, segmentStartRef.current),
         );
         const anchorToken = normalizedWords[anchorWordIndex]?.texto || '';
-        const punctuationHold = isMobileSync ? 0 : getTokenPauseHoldSeconds(anchorToken, playbackRateRef.current);
-        const effectiveDeltaSeconds = Math.max(0, deltaSeconds - punctuationHold);
-        const charRate = currentCharRateRef.current > 0
-          ? currentCharRateRef.current
-          : estimateCharRate(playbackRateRef.current, learnedCharRateAtOneXRef.current);
+        const punctuationHold = getTokenPauseHoldSeconds(anchorToken, playbackRateRef.current);
+        const shouldHoldAtPunctuation = punctuationHold > 0 && deltaSeconds < punctuationHold;
 
-        const estimatedChar = clamp(
-          Math.floor(anchorChar + (charRate * effectiveDeltaSeconds)),
-          0,
-          Math.max(segmentTextLengthRef.current - 1, 0),
-        );
-
-        const localWordIndex = getLocalWordIndexByChar(segmentWordsRef.current, estimatedChar);
-        const charIndex = clamp(
-          segmentStartRef.current + localWordIndex,
-          segmentStartRef.current,
-          Math.max(segmentEndRef.current, segmentStartRef.current),
-        );
-
-        if (boundarySeenRef.current) {
-          nextIndex = charIndex;
+        if (shouldHoldAtPunctuation) {
+          nextIndex = currentWordIndexRef.current;
         } else {
-          const blended = Math.round((charIndex * 0.55) + (timelineIndex * 0.45));
-          nextIndex = clamp(
-            blended,
+          const effectiveDeltaSeconds = Math.max(0, deltaSeconds - punctuationHold);
+          const charRate = currentCharRateRef.current > 0
+            ? currentCharRateRef.current
+            : estimateCharRate(playbackRateRef.current, learnedCharRateAtOneXRef.current);
+
+          const estimatedChar = clamp(
+            Math.floor(anchorChar + (charRate * effectiveDeltaSeconds)),
+            0,
+            Math.max(segmentTextLengthRef.current - 1, 0),
+          );
+
+          const localWordIndex = getLocalWordIndexByChar(segmentWordsRef.current, estimatedChar);
+          const charIndex = clamp(
+            segmentStartRef.current + localWordIndex,
             segmentStartRef.current,
             Math.max(segmentEndRef.current, segmentStartRef.current),
           );
+
+          if (boundarySeenRef.current) {
+            nextIndex = charIndex;
+          } else {
+            const blended = Math.round((charIndex * 0.55) + (timelineIndex * 0.45));
+            nextIndex = clamp(
+              blended,
+              segmentStartRef.current,
+              Math.max(segmentEndRef.current, segmentStartRef.current),
+            );
+          }
         }
       }
 
       if (nextIndex < currentWordIndexRef.current) {
         nextIndex = currentWordIndexRef.current;
+      }
+
+      if (nextIndex > currentWordIndexRef.current + 1) {
+        nextIndex = currentWordIndexRef.current + 1;
       }
 
       if (nextIndex !== currentWordIndexRef.current) {
@@ -1013,7 +925,7 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [canUse, emitWord, isMobileSync, isPlaying, normalizedWords, totalWords]);
+  }, [canUse, emitWord, isPlaying, normalizedWords, totalWords]);
 
   useEffect(() => {
     if (!externalAction?.id) return;
@@ -1057,10 +969,10 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
       totalWords,
       selectedVoiceName: selectedVoice?.name || '',
       progressPercent: totalWords > 1 ? (currentWordIndex / (totalWords - 1)) * 100 : 0,
-      syncMode: isMobileSync ? 'chunk' : 'word',
+      syncMode: 'word',
       activeRange,
     });
-  }, [activeRange, canUse, currentWordIndex, isMobileSync, isPaused, isPlaying, onStatusChange, selectedVoice, supported, totalWords]);
+  }, [activeRange, canUse, currentWordIndex, isPaused, isPlaying, onStatusChange, selectedVoice, supported, totalWords]);
 
   const handleRate = (delta) => {
     setVoiceRate((previous) => {
@@ -1251,6 +1163,11 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
 });
 
 export default SpeechSynthesisPlayer;
+
+
+
+
+
 
 
 

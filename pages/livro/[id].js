@@ -226,9 +226,7 @@ export default function LeituraPage() {
   const canDecreaseSpeed = guidedSpeed > 0.5;
 
   const syncLabel = speechSyncActive
-    ? speechStatus.syncMode === 'chunk'
-      ? 'Sincronizado por trechos (mobile)'
-      : 'Sincronizado por palavra (desktop)'
+    ? 'Sincronizado por palavra'
     : 'Modo visual independente';
 
   const pageRanges = useMemo(() => buildPageRanges(story?.palavras), [story]);
@@ -665,8 +663,8 @@ export default function LeituraPage() {
                 highContrast={highContrast}
                 visibleRange={currentPageRange}
                 centerOnWordToken={centerOnWordToken}
-                highlightMode={speechSyncActive ? speechStatus.syncMode : 'word'}
-                highlightRange={speechSyncActive ? speechStatus.activeRange : null}
+                highlightMode='word'
+                highlightRange={null}
               />
 
               <div className='mt-8 border-t border-leiae-dark/10 pt-4'>
@@ -837,6 +835,8 @@ export default function LeituraPage() {
     </>
   );
 }
+
+
 
 
 
