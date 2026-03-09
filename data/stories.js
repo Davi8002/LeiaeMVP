@@ -12,6 +12,26 @@ function splitIntoWords(text) {
   return matches;
 }
 
+function getTimingWeight(token) {
+  const value = String(token || '');
+  const endsStrong = /[.!?…]+[)"'\]»”]*$/.test(value);
+  const endsMedium = /[,;:]+[)"'\]»”]*$/.test(value);
+  const isDash = /^[-—–]+$/.test(value);
+
+  let weight = 1;
+  if (endsStrong) {
+    weight += 1.15;
+  } else if (endsMedium) {
+    weight += 0.45;
+  }
+
+  if (isDash) {
+    weight += 0.25;
+  }
+
+  return weight;
+}
+
 function buildTimedPhrases(paragrafos) {
   let cursor = 0;
   let globalIndex = 0;
@@ -48,11 +68,16 @@ function buildTimedWords(frases) {
   const palavras = frases.flatMap((frase) => {
     const words = splitIntoWords(frase.texto);
     const phraseDuration = Math.max(frase.fim - frase.inicio, 0.6);
-    const wordDuration = phraseDuration / Math.max(words.length, 1);
+    const wordWeights = words.map((word) => getTimingWeight(word));
+    const totalWeight = wordWeights.reduce((sum, weight) => sum + weight, 0) || words.length || 1;
+    let phraseCursor = frase.inicio;
 
     return words.map((palavra, ordemNaFrase) => {
-      const inicio = Number((frase.inicio + ordemNaFrase * wordDuration).toFixed(2));
-      const fim = Number((frase.inicio + (ordemNaFrase + 1) * wordDuration).toFixed(2));
+      const weight = wordWeights[ordemNaFrase] || 1;
+      const duration = phraseDuration * (weight / totalWeight);
+      const inicio = Number(phraseCursor.toFixed(2));
+      phraseCursor += duration;
+      const fim = Number(phraseCursor.toFixed(2));
 
       if (fullText.length > 0) {
         fullText += ' ';
@@ -103,7 +128,7 @@ export const stories = [
     titulo: 'O Alienista',
     autor: 'Machado de Assis',
     nivel: 'Avançada',
-    duracao: '35 min',
+    duracao: '85 min',
     descricao: 'Simão Bacamarte funda a Casa Verde em Itaguaí e transforma a cidade em laboratório sobre razão e loucura.',
     cover: '/capas/alienista-capa.jpg',
     paragrafos: alienistaParagraphs,
@@ -113,3 +138,4 @@ export const stories = [
 export function getStoryById(id) {
   return stories.find((story) => story.id === id);
 }
+

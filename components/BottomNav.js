@@ -1,7 +1,7 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 
 const tabs = [
-  { id: 'home', label: 'In\u00edcio', href: '/' },
+  { id: 'home', label: 'Início', href: '/' },
   { id: 'biblioteca', label: 'Biblioteca', href: '/biblioteca' },
   { id: 'leitura', label: 'Leitura', href: '/biblioteca' },
   { id: 'config', label: 'Ajustes', href: '/ajustes' },

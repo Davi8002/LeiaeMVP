@@ -15,8 +15,8 @@ function BackArrow() {
 
 export default function AppShell({
   children,
-  title = 'LeiaÃŠ',
-  subtitle = 'Leitura acessÃ­vel',
+  title = 'LeiaÊ',
+  subtitle = 'Leitura acessível',
   activeTab = 'home',
   darkHeader = true,
   showTopNav = true,
@@ -55,7 +55,7 @@ export default function AppShell({
 
   const tabs = useMemo(
     () => [
-      { id: 'home', label: 'InÃ­cio', href: '/' },
+      { id: 'home', label: 'Início', href: '/' },
       { id: 'biblioteca', label: 'Biblioteca', href: '/biblioteca' },
       { id: 'leitura', label: 'Leitura', href: resolvedReadingHref },
       { id: 'config', label: 'Ajustes', href: '/ajustes' },
@@ -145,3 +145,4 @@ export default function AppShell({
     </main>
   );
 }
+

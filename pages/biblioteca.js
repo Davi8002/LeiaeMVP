@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import { useMemo, useState } from 'react';
 import AppShell from '../components/AppShell';
 import StoryCard from '../components/StoryCard';
@@ -82,4 +82,3 @@ export default function BibliotecaPage() {
     </>
   );
 }
-

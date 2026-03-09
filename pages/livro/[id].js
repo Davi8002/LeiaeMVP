@@ -99,27 +99,59 @@ function buildPageRanges(words) {
     return [{ start: 0, end: 0 }];
   }
 
+  const MIN_CHARS = 800;
+  const TARGET_CHARS = 1000;
+  const MAX_CHARS = 1200;
+
   const ranges = [];
-  const wordsPerPage = 110;
-  const minWordsPerPage = 78;
   let start = 0;
 
   while (start < words.length) {
-    const isLastChunk = start + wordsPerPage >= words.length;
-    let end = isLastChunk ? words.length - 1 : start + wordsPerPage - 1;
+    let end = start;
+    let currentChars = 0;
+    let breakCandidate = -1;
 
-    if (!isLastChunk) {
-      const searchStart = Math.max(start + minWordsPerPage - 1, start);
-      for (let i = end; i >= searchStart; i -= 1) {
-        if (/[.!?\u2026]$/.test(words[i].texto)) {
-          end = i;
-          break;
-        }
+    while (end < words.length) {
+      const token = String(words[end]?.texto || '');
+      const tokenLength = token.length + (end > start ? 1 : 0);
+      const nextChars = currentChars + tokenLength;
+
+      if (end > start && nextChars > MAX_CHARS && breakCandidate >= start) {
+        break;
+      }
+
+      if (end > start && nextChars > MAX_CHARS + 120) {
+        break;
+      }
+
+      currentChars = nextChars;
+
+      const strongBreak = /[.!?…]+[)"'\]»”]*$/.test(token);
+      const mediumBreak = /[,;:]+[)"'\]»”]*$/.test(token);
+
+      if (currentChars >= MIN_CHARS && (strongBreak || (currentChars >= TARGET_CHARS && mediumBreak))) {
+        breakCandidate = end;
+      }
+
+      end += 1;
+
+      if (currentChars >= TARGET_CHARS && breakCandidate >= start && currentChars >= MAX_CHARS) {
+        break;
       }
     }
 
-    ranges.push({ start, end });
-    start = end + 1;
+    if (end >= words.length) {
+      ranges.push({ start, end: words.length - 1 });
+      break;
+    }
+
+    let chosenEnd = breakCandidate >= start ? breakCandidate : end - 1;
+    if (chosenEnd < start) {
+      chosenEnd = start;
+    }
+
+    ranges.push({ start, end: chosenEnd });
+    start = chosenEnd + 1;
   }
 
   return ranges;
@@ -176,7 +208,7 @@ export default function LeituraPage() {
   }, [guidedPlaying]);
 
   const totalWords = story?.palavras?.length ?? 1;
-  const pageTitle = story ? `${story.titulo} | LeiaÃŠ` : 'Leitura | LeiaÃŠ';
+  const pageTitle = story ? `${story.titulo} | LeiaÊ` : 'Leitura | LeiaÊ';
 
   const roboticVoiceActive = voiceMode === 'robotic';
   const showSidePanel = !controlsCollapsed;
@@ -361,7 +393,7 @@ export default function LeituraPage() {
         await document.exitFullscreen?.();
       }
     } catch (_error) {
-      // Ignora erro de permissÃ£o/ambiente.
+      // Ignora erro de permissão/ambiente.
     }
   };
 
@@ -488,13 +520,13 @@ export default function LeituraPage() {
       <>
         <Head>
           <meta charSet='UTF-8' />
-          <title>Leitura | LeiaÃŠ</title>
-          <meta name='description' content='Tela de leitura acessÃ­vel do LeiaÃŠ.' />
+          <title>Leitura | LeiaÊ</title>
+          <meta name='description' content='Tela de leitura acessível do LeiaÊ.' />
         </Head>
 
         <main className='flex min-h-screen items-center justify-center bg-leiae-bg px-6 text-center text-leiae-dark'>
           <div>
-            <p className='text-xl font-semibold'>HistÃ³ria nÃ£o encontrada.</p>
+            <p className='text-xl font-semibold'>História não encontrada.</p>
             <Link href='/biblioteca' className='mt-5 inline-flex rounded-xl bg-leiae-accent px-5 py-3 font-bold text-leiae-bg'>
               Voltar para biblioteca
             </Link>
@@ -517,11 +549,11 @@ export default function LeituraPage() {
       <Head>
         <meta charSet='UTF-8' />
         <title>{pageTitle}</title>
-        <meta name='description' content={`Leitura da histÃ³ria ${story.titulo} no LeiaÃŠ.`} />
+        <meta name='description' content={`Leitura da história ${story.titulo} no LeiaÊ.`} />
       </Head>
 
       <AppShell
-        title='LeiaÃŠ'
+        title='LeiaÊ'
         subtitle='Modo leitura'
         activeTab='leitura'
         darkHeader
@@ -602,8 +634,8 @@ export default function LeituraPage() {
                       onClick={() => handleQuickJump(3)}
                       disabled={quickDisabled}
                       className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-leiae-dark/20 bg-white transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
-                      aria-label='AvanÃ§ar 3 palavras'
-                      title='AvanÃ§ar 3 palavras'
+                      aria-label='Avançar 3 palavras'
+                      title='Avançar 3 palavras'
                     >
                       <QuickForwardIcon />
                     </button>
@@ -765,7 +797,7 @@ export default function LeituraPage() {
                   />
                 ) : (
                   <div className='rounded-2xl border border-leiae-dark/10 bg-white/80 px-3 py-2 text-center text-xs font-semibold text-leiae-dark/75'>
-                    Leitura humanizada ainda nÃ£o disponÃ­vel.
+                    Leitura humanizada ainda não disponível.
                   </div>
                 )}
               </div>
@@ -795,6 +827,7 @@ export default function LeituraPage() {
     </>
   );
 }
+
 
 
 
