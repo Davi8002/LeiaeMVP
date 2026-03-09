@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -146,7 +146,7 @@ function BackwardIcon() {
   );
 }
 
-export default function SpeechSynthesisPlayer({
+const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
   text,
   words,
   activeWordIndex,
@@ -154,11 +154,12 @@ export default function SpeechSynthesisPlayer({
   voiceGender = 'female',
   onWordBoundary,
   onPlayStateChange,
+  onPlaybackIntent,
   onRateChange,
   onStatusChange,
   externalAction,
   compact = false,
-}) {
+}, ref) {
   const utteranceTokenRef = useRef(0);
   const segmentWordsRef = useRef([]);
   const segmentStartRef = useRef(0);
@@ -170,6 +171,7 @@ export default function SpeechSynthesisPlayer({
 
   const playbackStartMsRef = useRef(0);
   const playbackBaseSecondsRef = useRef(0);
+  const playbackRateRef = useRef(clamp(Number(initialRate) || 1, 0.6, 2));
   const pausedAtMsRef = useRef(null);
   const boundarySeenRef = useRef(false);
   const lastBoundaryAtMsRef = useRef(0);
@@ -224,6 +226,19 @@ export default function SpeechSynthesisPlayer({
     [maxIndex, onWordBoundary],
   );
 
+  const getRuntimePlaybackState = useCallback(() => {
+    if (typeof window !== 'undefined' && supported) {
+      const speech = window.speechSynthesis;
+      if (speech.speaking) {
+        return speech.paused ? 'paused' : 'playing';
+      }
+    }
+
+    if (status === 'playing') return 'playing';
+    if (status === 'paused') return 'paused';
+    return 'idle';
+  }, [status, supported]);
+
   const buildSpeechSegment = useCallback(
     (startIndex) => {
       const start = clamp(startIndex, 0, maxIndex);
@@ -273,20 +288,21 @@ export default function SpeechSynthesisPlayer({
       setIsSeeking(false);
       setStatus(nextStatus);
       onPlayStateChange?.(false);
+      onPlaybackIntent?.(false);
     },
-    [onPlayStateChange, supported],
+    [onPlayStateChange, onPlaybackIntent, supported],
   );
 
   const startSpeech = useCallback(
     (targetIndex, options = {}) => {
-      if (!canUse || typeof window === 'undefined') return;
+      if (!canUse || typeof window === 'undefined') return false;
 
       const pauseAfterStart = Boolean(options.pauseAfterStart);
       const rateOverride = Number(options.rateOverride);
       const utteranceRate = Number.isFinite(rateOverride) ? rateOverride : voiceRate;
 
       const { start, speechText, mappedWords } = buildSpeechSegment(targetIndex);
-      if (!speechText) return;
+      if (!speechText) return false;
 
       const token = utteranceTokenRef.current + 1;
       utteranceTokenRef.current = token;
@@ -302,6 +318,7 @@ export default function SpeechSynthesisPlayer({
 
       playbackStartMsRef.current = Date.now();
       playbackBaseSecondsRef.current = getWordStartSeconds(normalizedWords[start], start);
+      playbackRateRef.current = utteranceRate;
       pausedAtMsRef.current = null;
       boundarySeenRef.current = false;
       lastBoundaryAtMsRef.current = 0;
@@ -326,6 +343,7 @@ export default function SpeechSynthesisPlayer({
           pausedAtMsRef.current = Date.now();
           setStatus('paused');
           onPlayStateChange?.(false);
+          onPlaybackIntent?.(false);
           window.speechSynthesis.pause();
           return;
         }
@@ -333,6 +351,7 @@ export default function SpeechSynthesisPlayer({
         userPausedRef.current = false;
         setStatus('playing');
         onPlayStateChange?.(true);
+        onPlaybackIntent?.(true);
       };
 
       utterance.onboundary = (event) => {
@@ -370,6 +389,7 @@ export default function SpeechSynthesisPlayer({
         pausedAtMsRef.current = Date.now();
         setStatus('paused');
         onPlayStateChange?.(false);
+        onPlaybackIntent?.(false);
       };
 
       utterance.onresume = () => {
@@ -384,6 +404,7 @@ export default function SpeechSynthesisPlayer({
         userPausedRef.current = false;
         setStatus('playing');
         onPlayStateChange?.(true);
+        onPlaybackIntent?.(true);
       };
 
       utterance.onend = () => {
@@ -399,6 +420,7 @@ export default function SpeechSynthesisPlayer({
         emitWord(maxIndex, { syncSeek: true });
         setStatus('idle');
         onPlayStateChange?.(false);
+        onPlaybackIntent?.(false);
       };
 
       utterance.onerror = () => {
@@ -409,11 +431,178 @@ export default function SpeechSynthesisPlayer({
         setStatus('idle');
         setSpeechError('N\u00e3o foi poss\u00edvel reproduzir a voz autom\u00e1tica neste navegador.');
         onPlayStateChange?.(false);
+        onPlaybackIntent?.(false);
       };
 
       window.speechSynthesis.speak(utterance);
+      return true;
     },
-    [buildSpeechSegment, canUse, emitWord, maxIndex, normalizedWords, onPlayStateChange, selectedVoice, voiceRate],
+    [buildSpeechSegment, canUse, emitWord, maxIndex, normalizedWords, onPlayStateChange, onPlaybackIntent, selectedVoice, voiceRate],
+  );
+
+  const restartFromIndex = useCallback(
+    (index, options = {}) => {
+      const nextIndex = clamp(index, 0, maxIndex);
+      const keepPaused = Boolean(options.keepPaused);
+      const rateOverride = options.rateOverride;
+
+      if (keepPaused) {
+        userPausedRef.current = true;
+        setStatus('paused');
+        onPlayStateChange?.(false);
+        onPlaybackIntent?.(false);
+      }
+
+      startSpeech(nextIndex, { pauseAfterStart: keepPaused, rateOverride });
+    },
+    [maxIndex, onPlayStateChange, onPlaybackIntent, startSpeech],
+  );
+
+  const handlePlay = useCallback(() => {
+    if (!supported || typeof window === 'undefined') return;
+
+    onPlaybackIntent?.(true);
+
+    if (!canUse) {
+      pendingPlayRef.current = true;
+      return;
+    }
+
+    const speech = window.speechSynthesis;
+
+    if (speech.paused && speech.speaking) {
+      pendingPlayRef.current = false;
+      userPausedRef.current = false;
+      pauseAfterStartRef.current = false;
+      setStatus('playing');
+      onPlayStateChange?.(true);
+      speech.resume();
+      return;
+    }
+
+    if (speech.speaking && !speech.paused) {
+      pendingPlayRef.current = false;
+      userPausedRef.current = false;
+      pauseAfterStartRef.current = false;
+      setStatus('playing');
+      onPlayStateChange?.(true);
+      return;
+    }
+
+    pendingPlayRef.current = false;
+    userPausedRef.current = false;
+    pauseAfterStartRef.current = false;
+    setStatus('playing');
+    onPlayStateChange?.(true);
+    startSpeech(seekWordIndex, { pauseAfterStart: false });
+  }, [canUse, onPlayStateChange, onPlaybackIntent, seekWordIndex, startSpeech, supported]);
+
+  const handlePause = useCallback(() => {
+    if (!supported || typeof window === 'undefined') return;
+
+    const speech = window.speechSynthesis;
+
+    onPlaybackIntent?.(false);
+    userPausedRef.current = true;
+    pauseAfterStartRef.current = false;
+    pausedAtMsRef.current = Date.now();
+    setStatus('paused');
+    onPlayStateChange?.(false);
+
+    if (speech.speaking && !speech.paused) {
+      speech.pause();
+      window.setTimeout(() => {
+        if (speech.speaking && !speech.paused) {
+          speech.pause();
+        }
+      }, 45);
+      return;
+    }
+
+    if (!speech.speaking) {
+      pauseAfterStartRef.current = true;
+    }
+  }, [onPlayStateChange, onPlaybackIntent, supported]);
+
+  const togglePlayback = useCallback(() => {
+    const runtimeState = getRuntimePlaybackState();
+    if (runtimeState === 'playing') {
+      handlePause();
+      return;
+    }
+
+    handlePlay();
+  }, [getRuntimePlaybackState, handlePause, handlePlay]);
+
+  const handleJump = useCallback(
+    (step) => {
+      const nextIndex = clamp(currentWordIndexRef.current + step, 0, maxIndex);
+      setSeekWordIndex(nextIndex);
+      emitWord(nextIndex);
+
+      const runtimeState = getRuntimePlaybackState();
+
+      if (runtimeState === 'playing') {
+        restartFromIndex(nextIndex);
+        return;
+      }
+
+      if (runtimeState === 'paused') {
+        restartFromIndex(nextIndex, { keepPaused: true });
+      }
+    },
+    [emitWord, getRuntimePlaybackState, maxIndex, restartFromIndex],
+  );
+
+  const handleSeekToIndex = useCallback(
+    (index) => {
+      const nextIndex = clamp(index, 0, maxIndex);
+      setSeekWordIndex(nextIndex);
+      emitWord(nextIndex);
+
+      const runtimeState = getRuntimePlaybackState();
+
+      if (runtimeState === 'playing') {
+        restartFromIndex(nextIndex);
+        return;
+      }
+
+      if (runtimeState === 'paused') {
+        restartFromIndex(nextIndex, { keepPaused: true });
+      }
+    },
+    [emitWord, getRuntimePlaybackState, maxIndex, restartFromIndex],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      togglePlayPause: togglePlayback,
+      play: handlePlay,
+      pause: handlePause,
+      stop: () => stopSpeech('idle'),
+      jump: (step) => {
+        const jumpStep = Number(step) || 0;
+        if (jumpStep !== 0) {
+          handleJump(jumpStep);
+        }
+      },
+      seek: (index) => {
+        const nextIndex = Number(index);
+        if (Number.isFinite(nextIndex)) {
+          handleSeekToIndex(nextIndex);
+        }
+      },
+      getSnapshot: () => ({
+        supported,
+        canUse,
+        isPlaying,
+        isPaused,
+        currentWordIndex: currentWordIndexRef.current,
+        totalWords,
+      }),
+    }),
+    [canUse, handleJump, handlePause, handlePlay, handleSeekToIndex, isPaused, isPlaying, stopSpeech, supported, togglePlayback, totalWords],
   );
 
   useEffect(() => {
@@ -459,7 +648,11 @@ export default function SpeechSynthesisPlayer({
   useEffect(() => {
     const nextRate = clamp(Number(initialRate) || 1, 0.6, 2);
     setVoiceRate(nextRate);
-  }, [initialRate]);
+
+    if (!isPlaying && !isPaused) {
+      playbackRateRef.current = nextRate;
+    }
+  }, [initialRate, isPaused, isPlaying]);
 
   useEffect(() => {
     if (!supported) return;
@@ -484,92 +677,10 @@ export default function SpeechSynthesisPlayer({
     currentWordIndexRef.current = bounded;
     setCurrentWordIndex(bounded);
 
-    if (!isPlaying) {
+    if (getRuntimePlaybackState() !== 'playing') {
       setSeekWordIndex(bounded);
     }
-  }, [activeWordIndex, isPlaying, maxIndex]);
-
-  useEffect(() => {
-    if (!isPlaying || !canUse || totalWords < 2) return undefined;
-
-    const timer = window.setInterval(() => {
-      const now = Date.now();
-
-      if (boundarySeenRef.current && now - lastBoundaryAtMsRef.current < 900) {
-        return;
-      }
-
-      if (!playbackStartMsRef.current) {
-        return;
-      }
-
-      const elapsedSeconds = (now - playbackStartMsRef.current) / 1000;
-      const timelineSeconds = playbackBaseSecondsRef.current + elapsedSeconds * voiceRate;
-      const nextIndex = findWordIndexByTimeline(normalizedWords, timelineSeconds, segmentStartRef.current);
-
-      if (nextIndex !== currentWordIndexRef.current) {
-        emitWord(nextIndex, { syncSeek: true });
-      }
-    }, 120);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [canUse, emitWord, isPlaying, normalizedWords, totalWords, voiceRate]);
-
-  const restartFromIndex = useCallback(
-    (index, options = {}) => {
-      const nextIndex = clamp(index, 0, maxIndex);
-      const keepPaused = Boolean(options.keepPaused);
-      const rateOverride = options.rateOverride;
-
-      if (keepPaused) {
-        userPausedRef.current = true;
-        setStatus('paused');
-        onPlayStateChange?.(false);
-      }
-
-      startSpeech(nextIndex, { pauseAfterStart: keepPaused, rateOverride });
-    },
-    [maxIndex, onPlayStateChange, startSpeech],
-  );
-
-  const handlePlay = useCallback(() => {
-    if (!supported || typeof window === 'undefined') return;
-
-    if (!canUse) {
-      pendingPlayRef.current = true;
-      return;
-    }
-
-    const speech = window.speechSynthesis;
-
-    if (speech.paused && speech.speaking) {
-      pendingPlayRef.current = false;
-      userPausedRef.current = false;
-      pauseAfterStartRef.current = false;
-      setStatus('playing');
-      onPlayStateChange?.(true);
-      speech.resume();
-      return;
-    }
-
-    if (speech.speaking && !speech.paused) {
-      pendingPlayRef.current = false;
-      userPausedRef.current = false;
-      pauseAfterStartRef.current = false;
-      setStatus('playing');
-      onPlayStateChange?.(true);
-      return;
-    }
-
-    pendingPlayRef.current = false;
-    userPausedRef.current = false;
-    pauseAfterStartRef.current = false;
-    setStatus('playing');
-    onPlayStateChange?.(true);
-    startSpeech(seekWordIndex, { pauseAfterStart: false });
-  }, [canUse, onPlayStateChange, seekWordIndex, startSpeech, supported]);
+  }, [activeWordIndex, getRuntimePlaybackState, maxIndex]);
 
   useEffect(() => {
     if (!canUse || !pendingPlayRef.current) return;
@@ -578,67 +689,38 @@ export default function SpeechSynthesisPlayer({
     handlePlay();
   }, [canUse, handlePlay]);
 
-  const handlePause = useCallback(() => {
-    if (!supported || !canUse || typeof window === 'undefined') return;
+  useEffect(() => {
+    if (!isPlaying || !canUse || totalWords < 2 || typeof window === 'undefined') return undefined;
 
-    const speech = window.speechSynthesis;
+    let frameId = 0;
 
-    userPausedRef.current = true;
-    pauseAfterStartRef.current = false;
-    pausedAtMsRef.current = Date.now();
-    setStatus('paused');
-    onPlayStateChange?.(false);
+    const tick = () => {
+      const now = Date.now();
 
-    if (speech.speaking && !speech.paused) {
-      speech.pause();
-      window.setTimeout(() => {
-        if (speech.speaking && !speech.paused) {
-          speech.pause();
+      if (!playbackStartMsRef.current) {
+        frameId = window.requestAnimationFrame(tick);
+        return;
+      }
+
+      if (!boundarySeenRef.current || now - lastBoundaryAtMsRef.current >= 900) {
+        const elapsedSeconds = (now - playbackStartMsRef.current) / 1000;
+        const timelineSeconds = playbackBaseSecondsRef.current + elapsedSeconds * playbackRateRef.current;
+        const nextIndex = findWordIndexByTimeline(normalizedWords, timelineSeconds, segmentStartRef.current);
+
+        if (nextIndex !== currentWordIndexRef.current) {
+          emitWord(nextIndex, { syncSeek: true });
         }
-      }, 45);
-      return;
-    }
-
-    if (!speech.speaking) {
-      pauseAfterStartRef.current = true;
-    }
-  }, [canUse, onPlayStateChange, supported]);
-
-  const handleJump = useCallback(
-    (step) => {
-      const nextIndex = clamp(currentWordIndexRef.current + step, 0, maxIndex);
-      setSeekWordIndex(nextIndex);
-      emitWord(nextIndex);
-
-      if (isPlaying) {
-        restartFromIndex(nextIndex);
-        return;
       }
 
-      if (isPaused) {
-        restartFromIndex(nextIndex, { keepPaused: true });
-      }
-    },
-    [emitWord, isPaused, isPlaying, maxIndex, restartFromIndex],
-  );
+      frameId = window.requestAnimationFrame(tick);
+    };
 
-  const handleSeekToIndex = useCallback(
-    (index) => {
-      const nextIndex = clamp(index, 0, maxIndex);
-      setSeekWordIndex(nextIndex);
-      emitWord(nextIndex);
+    frameId = window.requestAnimationFrame(tick);
 
-      if (isPlaying) {
-        restartFromIndex(nextIndex);
-        return;
-      }
-
-      if (isPaused) {
-        restartFromIndex(nextIndex, { keepPaused: true });
-      }
-    },
-    [emitWord, isPaused, isPlaying, maxIndex, restartFromIndex],
-  );
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [canUse, emitWord, isPlaying, normalizedWords, totalWords]);
 
   useEffect(() => {
     if (!externalAction?.id) return;
@@ -647,14 +729,7 @@ export default function SpeechSynthesisPlayer({
     lastExternalActionRef.current = externalAction.id;
 
     if (externalAction.type === 'toggle-play') {
-      const speech = typeof window !== 'undefined' ? window.speechSynthesis : null;
-      const playingNow = Boolean(speech && speech.speaking && !speech.paused);
-
-      if (isPlaying || playingNow) {
-        handlePause();
-      } else {
-        handlePlay();
-      }
+      togglePlayback();
       return;
     }
 
@@ -677,7 +752,7 @@ export default function SpeechSynthesisPlayer({
         handleSeekToIndex(index);
       }
     }
-  }, [externalAction, handleJump, handlePause, handlePlay, handleSeekToIndex, isPlaying, stopSpeech]);
+  }, [externalAction, handleJump, handleSeekToIndex, stopSpeech, togglePlayback]);
 
   useEffect(() => {
     onStatusChange?.({
@@ -699,14 +774,14 @@ export default function SpeechSynthesisPlayer({
       if (next !== previous) {
         onRateChange?.(next);
 
-        const speech = typeof window !== 'undefined' ? window.speechSynthesis : null;
-        const runtimePlaying = Boolean(speech && speech.speaking && !speech.paused);
-        const runtimePaused = Boolean(speech && speech.speaking && speech.paused);
+        const runtimeState = getRuntimePlaybackState();
 
-        if (isPlaying || runtimePlaying) {
+        if (runtimeState === 'playing') {
           restartFromIndex(currentWordIndexRef.current, { rateOverride: next });
-        } else if (isPaused || runtimePaused) {
+        } else if (runtimeState === 'paused') {
           restartFromIndex(currentWordIndexRef.current, { keepPaused: true, rateOverride: next });
+        } else {
+          playbackRateRef.current = next;
         }
       }
 
@@ -731,12 +806,14 @@ export default function SpeechSynthesisPlayer({
     isSeekingRef.current = false;
     setIsSeeking(false);
 
-    if (isPlaying) {
+    const runtimeState = getRuntimePlaybackState();
+
+    if (runtimeState === 'playing') {
       restartFromIndex(seekWordIndex);
       return;
     }
 
-    if (isPaused) {
+    if (runtimeState === 'paused') {
       restartFromIndex(seekWordIndex, { keepPaused: true });
       return;
     }
@@ -769,7 +846,7 @@ export default function SpeechSynthesisPlayer({
 
         <button
           type='button'
-          onClick={isPlaying ? handlePause : handlePlay}
+          onClick={togglePlayback}
           disabled={!canUse}
           className='inline-flex h-12 w-12 items-center justify-center rounded-full bg-leiae-accent text-leiae-bg shadow transition-all duration-200 hover:bg-leiae-dark disabled:cursor-not-allowed disabled:opacity-50 [touch-action:manipulation] sm:h-14 sm:w-14'
           aria-label={isPlaying ? 'Pausar leitura autom\u00e1tica' : 'Iniciar leitura autom\u00e1tica'}
@@ -876,4 +953,6 @@ export default function SpeechSynthesisPlayer({
       {controls}
     </section>
   );
-}
+});
+
+export default SpeechSynthesisPlayer;

@@ -129,7 +129,7 @@ export default function LeituraPage() {
   const router = useRouter();
   const { id } = router.query;
   const readingSurfaceRef = useRef(null);
-  const speechActionIdRef = useRef(0);
+  const speechPlayerRef = useRef(null);
   const speechStatusRef = useRef({
     supported: true,
     canUse: false,
@@ -159,8 +159,6 @@ export default function LeituraPage() {
   const [guidedPlaying, setGuidedPlaying] = useState(false);
   const [guidedSpeed, setGuidedSpeed] = useState(defaultReadingPreferences.guidedSpeed);
   const [guidedWordIndex, setGuidedWordIndex] = useState(0);
-
-  const [speechAction, setSpeechAction] = useState(null);
   const [speechStatus, setSpeechStatus] = useState({
     supported: true,
     canUse: false,
@@ -203,15 +201,6 @@ export default function LeituraPage() {
 
   const currentPageRange = pageRanges[currentPageIndex] || pageRanges[0];
 
-  const dispatchSpeechAction = useCallback((type, payload = {}) => {
-    speechActionIdRef.current += 1;
-    setSpeechAction({
-      id: speechActionIdRef.current,
-      type,
-      ...payload,
-    });
-  }, []);
-
   const handleSpeechStatus = useCallback((nextStatus) => {
     const previous = speechStatusRef.current;
     speechStatusRef.current = nextStatus;
@@ -223,6 +212,36 @@ export default function LeituraPage() {
 
     if (previous.isPaused && nextStatus.isPlaying) {
       setCenterOnWordToken((previousToken) => previousToken + 1);
+    }
+  }, []);
+
+  const stopRobotReading = useCallback(() => {
+    speechPlayerRef.current?.stop?.();
+  }, []);
+
+  const toggleRobotPlayback = useCallback(() => {
+    if (guidedPlayingRef.current) {
+      setGuidedPlaying(false);
+    }
+
+    speechPlayerRef.current?.togglePlayPause?.();
+  }, []);
+
+  const jumpRobotWords = useCallback((step) => {
+    if (guidedPlayingRef.current) {
+      setGuidedPlaying(false);
+    }
+
+    speechPlayerRef.current?.jump?.(step);
+  }, []);
+
+  const seekRobotWord = useCallback((index) => {
+    speechPlayerRef.current?.seek?.(index);
+  }, []);
+
+  const handleRobotPlaybackIntent = useCallback((isStarting) => {
+    if (isStarting && guidedPlayingRef.current) {
+      setGuidedPlaying(false);
     }
   }, []);
 
@@ -293,7 +312,7 @@ export default function LeituraPage() {
     if (roboticVoiceActive) return;
 
     if (speechStatusRef.current.isPlaying || speechStatusRef.current.isPaused) {
-      dispatchSpeechAction('stop');
+      stopRobotReading();
     }
 
     const resetStatus = {
@@ -305,7 +324,7 @@ export default function LeituraPage() {
 
     speechStatusRef.current = resetStatus;
     setSpeechStatus(resetStatus);
-  }, [dispatchSpeechAction, roboticVoiceActive]);
+  }, [roboticVoiceActive, stopRobotReading]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -373,7 +392,7 @@ export default function LeituraPage() {
     }
 
     if (roboticVoiceActive && (speechStatusRef.current.isPlaying || speechStatusRef.current.isPaused)) {
-      dispatchSpeechAction('stop');
+      stopRobotReading();
     }
 
     if (guidedWordIndex >= totalWords - 1) {
@@ -395,22 +414,12 @@ export default function LeituraPage() {
 
   const handleQuickJump = (step) => {
     if (quickDisabled) return;
-
-    if (guidedPlayingRef.current) {
-      setGuidedPlaying(false);
-    }
-
-    dispatchSpeechAction('jump', { step });
+    jumpRobotWords(step);
   };
 
   const handleQuickToggle = () => {
     if (quickDisabled) return;
-
-    if (guidedPlayingRef.current) {
-      setGuidedPlaying(false);
-    }
-
-    dispatchSpeechAction('toggle-play');
+    toggleRobotPlayback();
   };
 
   const navigatePage = (delta) => {
@@ -422,7 +431,7 @@ export default function LeituraPage() {
     setGuidedWordIndex(targetIndex);
 
     if (roboticVoiceActive && (speechStatusRef.current.isPlaying || speechStatusRef.current.isPaused)) {
-      dispatchSpeechAction('seek', { index: targetIndex });
+      seekRobotWord(targetIndex);
     }
   };
 
@@ -581,13 +590,13 @@ export default function LeituraPage() {
                     onClick={() => navigatePage(-1)}
                     disabled={currentPageIndex <= 0}
                     className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
-                    aria-label='P\u00e1gina anterior'
+                    aria-label='Página anterior'
                   >
                     <ArrowIcon direction='left' />
                   </button>
 
                   <span className='rounded-full bg-leiae-dark/10 px-3 py-1 text-xs font-semibold text-leiae-dark/75'>
-                    P\u00e1gina {currentPageIndex + 1}/{pageRanges.length}
+                    Página {currentPageIndex + 1}/{pageRanges.length}
                   </span>
 
                   <button
@@ -595,7 +604,7 @@ export default function LeituraPage() {
                     onClick={() => navigatePage(1)}
                     disabled={currentPageIndex >= pageRanges.length - 1}
                     className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-leiae-dark/20 bg-white text-leiae-dark transition hover:bg-leiae-bg disabled:cursor-not-allowed disabled:opacity-45 [touch-action:manipulation]'
-                    aria-label='Pr\u00f3xima p\u00e1gina'
+                    aria-label='Próxima página'
                   >
                     <ArrowIcon direction='right' />
                   </button>
@@ -668,6 +677,7 @@ export default function LeituraPage() {
 
                 {roboticVoiceActive ? (
                   <SpeechSynthesisPlayer
+                    ref={speechPlayerRef}
                     text={story.textoNarracao}
                     words={story.palavras}
                     activeWordIndex={guidedWordIndex}
@@ -676,7 +686,7 @@ export default function LeituraPage() {
                     onWordBoundary={setGuidedWordIndex}
                     onRateChange={setVoiceRate}
                     onStatusChange={handleSpeechStatus}
-                    externalAction={speechAction}
+                    onPlaybackIntent={handleRobotPlaybackIntent}
                     compact
                   />
                 ) : (
