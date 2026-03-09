@@ -55,6 +55,72 @@ function findWordIndexByTimeline(words, timelineSeconds, minIndex = 0) {
   return words.length - 1;
 }
 
+function buildChunkModel(words) {
+  if (!Array.isArray(words) || words.length === 0) {
+    return {
+      ranges: [{ start: 0, end: 0 }],
+      chunkStartByWord: [0],
+      chunkIndexByWord: [0],
+    };
+  }
+
+  const ranges = [];
+  const chunkStartByWord = new Array(words.length);
+  const chunkIndexByWord = new Array(words.length);
+
+  let start = 0;
+
+  while (start < words.length) {
+    let end = start;
+    let count = 0;
+
+    for (let index = start; index < words.length; index += 1) {
+      const token = String(words[index]?.texto || '');
+      count += 1;
+      end = index;
+
+      const strongBreak = /[.!?…]+[)"'\]»”]*$/.test(token);
+      const mediumBreak = /[,;:]+[)"'\]»”]*$/.test(token);
+
+      const shouldBreak =
+        (count >= 6 && strongBreak) ||
+        (count >= 10 && mediumBreak) ||
+        count >= 16 ||
+        index === words.length - 1;
+
+      if (shouldBreak) {
+        break;
+      }
+    }
+
+    const chunkIndex = ranges.length;
+    ranges.push({ start, end });
+
+    for (let i = start; i <= end; i += 1) {
+      chunkStartByWord[i] = start;
+      chunkIndexByWord[i] = chunkIndex;
+    }
+
+    start = end + 1;
+  }
+
+  return {
+    ranges,
+    chunkStartByWord,
+    chunkIndexByWord,
+  };
+}
+
+function isMobileReadingEnvironment() {
+  if (typeof window === 'undefined') return false;
+
+  const ua = window.navigator?.userAgent || '';
+  const uaMobile = /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(ua);
+  const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
+  const narrowViewport = window.matchMedia?.('(max-width: 768px)')?.matches ?? false;
+
+  return uaMobile || (coarsePointer && narrowViewport);
+}
 
 function estimateCharRate(rate, learnedRateAtOneX = 11.5) {
   const baseline = Number.isFinite(learnedRateAtOneX) && learnedRateAtOneX > 0
@@ -208,6 +274,7 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
   const [speechError, setSpeechError] = useState('');
   const [isSeeking, setIsSeeking] = useState(false);
   const [availableVoices, setAvailableVoices] = useState([]);
+  const [mobileEnvironment, setMobileEnvironment] = useState(false);
 
   const normalizedWords = useMemo(() => {
     if (Array.isArray(words) && words.length > 0) {
@@ -232,19 +299,41 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
     [availableVoices, voiceGender],
   );
 
+  const isMobileSync = mobileEnvironment;
+
+  const chunkModel = useMemo(
+    () => buildChunkModel(normalizedWords),
+    [normalizedWords],
+  );
+
+  const activeRange = useMemo(() => {
+    const bounded = clamp(currentWordIndex, 0, maxIndex);
+
+    if (!isMobileSync) {
+      return { start: bounded, end: bounded };
+    }
+
+    const chunkIndex = chunkModel.chunkIndexByWord[bounded] ?? 0;
+    return chunkModel.ranges[chunkIndex] || { start: bounded, end: bounded };
+  }, [chunkModel, currentWordIndex, isMobileSync, maxIndex]);
+
   const emitWord = useCallback(
     (index, options = {}) => {
       const bounded = clamp(index, 0, maxIndex);
+      const visualIndex = isMobileSync
+        ? (chunkModel.chunkStartByWord[bounded] ?? bounded)
+        : bounded;
+
       currentWordIndexRef.current = bounded;
       setCurrentWordIndex(bounded);
 
       if (options.syncSeek) {
-        setSeekWordIndex(bounded);
+        setSeekWordIndex(visualIndex);
       }
 
-      onWordBoundary?.(bounded);
+      onWordBoundary?.(visualIndex);
     },
-    [maxIndex, onWordBoundary],
+    [chunkModel, isMobileSync, maxIndex, onWordBoundary],
   );
 
   const getRuntimePlaybackState = useCallback(() => {
@@ -739,6 +828,24 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateEnvironment = () => {
+      setMobileEnvironment(isMobileReadingEnvironment());
+    };
+
+    updateEnvironment();
+
+    window.addEventListener('resize', updateEnvironment);
+    window.addEventListener('orientationchange', updateEnvironment);
+
+    return () => {
+      window.removeEventListener('resize', updateEnvironment);
+      window.removeEventListener('orientationchange', updateEnvironment);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!supported || typeof window === 'undefined') return undefined;
 
     return () => {
@@ -801,13 +908,13 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
     if (typeof activeWordIndex !== 'number') return;
     if (isSeekingRef.current) return;
 
+    const runtimeState = getRuntimePlaybackState();
+    if (runtimeState === 'playing') return;
+
     const bounded = clamp(activeWordIndex, 0, maxIndex);
     currentWordIndexRef.current = bounded;
     setCurrentWordIndex(bounded);
-
-    if (getRuntimePlaybackState() !== 'playing') {
-      setSeekWordIndex(bounded);
-    }
+    setSeekWordIndex(bounded);
   }, [activeWordIndex, getRuntimePlaybackState, maxIndex]);
 
   useEffect(() => {
@@ -929,8 +1036,10 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
       totalWords,
       selectedVoiceName: selectedVoice?.name || '',
       progressPercent: totalWords > 1 ? (currentWordIndex / (totalWords - 1)) * 100 : 0,
+      syncMode: isMobileSync ? 'chunk' : 'word',
+      activeRange,
     });
-  }, [canUse, currentWordIndex, isPaused, isPlaying, onStatusChange, selectedVoice, supported, totalWords]);
+  }, [activeRange, canUse, currentWordIndex, isMobileSync, isPaused, isPlaying, onStatusChange, selectedVoice, supported, totalWords]);
 
   const handleRate = (delta) => {
     setVoiceRate((previous) => {
@@ -1121,6 +1230,12 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
 });
 
 export default SpeechSynthesisPlayer;
+
+
+
+
+
+
 
 
 

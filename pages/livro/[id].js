@@ -170,6 +170,8 @@ export default function LeituraPage() {
     currentWordIndex: 0,
     totalWords: 0,
     progressPercent: 0,
+    syncMode: 'word',
+    activeRange: null,
   });
   const guidedPlayingRef = useRef(false);
 
@@ -199,6 +201,8 @@ export default function LeituraPage() {
     currentWordIndex: 0,
     totalWords: 0,
     progressPercent: 0,
+    syncMode: 'word',
+    activeRange: null,
   });
   const [pageInputValue, setPageInputValue] = useState('1');
   const [pageValidationMessage, setPageValidationMessage] = useState('');
@@ -221,7 +225,11 @@ export default function LeituraPage() {
   const canIncreaseSpeed = guidedSpeed < 3;
   const canDecreaseSpeed = guidedSpeed > 0.5;
 
-  const syncLabel = speechSyncActive ? 'Sincronizado com voz robotizada' : 'Modo visual independente';
+  const syncLabel = speechSyncActive
+    ? speechStatus.syncMode === 'chunk'
+      ? 'Sincronizado por trechos (mobile)'
+      : 'Sincronizado por palavra (desktop)'
+    : 'Modo visual independente';
 
   const pageRanges = useMemo(() => buildPageRanges(story?.palavras), [story]);
 
@@ -657,6 +665,8 @@ export default function LeituraPage() {
                 highContrast={highContrast}
                 visibleRange={currentPageRange}
                 centerOnWordToken={centerOnWordToken}
+                highlightMode={speechSyncActive ? speechStatus.syncMode : 'word'}
+                highlightRange={speechSyncActive ? speechStatus.activeRange : null}
               />
 
               <div className='mt-8 border-t border-leiae-dark/10 pt-4'>
@@ -827,6 +837,10 @@ export default function LeituraPage() {
     </>
   );
 }
+
+
+
+
 
 
 
