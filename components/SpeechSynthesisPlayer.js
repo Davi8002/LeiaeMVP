@@ -55,7 +55,6 @@ function findWordIndexByTimeline(words, timelineSeconds, minIndex = 0) {
   return words.length - 1;
 }
 
-
 function estimateCharRate(rate, learnedRateAtOneX = 11.5) {
   const baseline = Number.isFinite(learnedRateAtOneX) && learnedRateAtOneX > 0
     ? learnedRateAtOneX
@@ -64,6 +63,7 @@ function estimateCharRate(rate, learnedRateAtOneX = 11.5) {
   const safeRate = clamp(Number(rate) || 1, 0.6, 2);
   return Math.max(4.5, baseline * safeRate);
 }
+
 function getTokenPauseHoldSeconds(token, rate = 1) {
   const value = String(token || '');
   const strongBreak = /[.!?…]+[)"'\]»”]*$/.test(value);
@@ -71,15 +71,16 @@ function getTokenPauseHoldSeconds(token, rate = 1) {
   const safeRate = Math.max(Number(rate) || 1, 0.1);
 
   if (strongBreak) {
-    return 0.48 / Math.max(safeRate, 0.9);
+    return 0.82 / Math.max(safeRate, 0.8);
   }
 
   if (mediumBreak) {
-    return 0.24 / Math.max(safeRate, 0.9);
+    return 0.38 / Math.max(safeRate, 0.8);
   }
 
   return 0;
 }
+
 function scoreVoice(voice, normalizedGender) {
   const normalizedName = normalizeString(voice?.name);
   const normalizedLang = normalizeString(voice?.lang);
@@ -137,7 +138,6 @@ function pickVoiceByGender(voices, voiceGender) {
 
   return bestVoice;
 }
-
 const SPEECH_SEGMENT_MAX_WORDS = 180;
 const SPEECH_SEGMENT_TARGET_CHARS = 1100;
 const SPEECH_SEGMENT_HARD_CHARS = 1500;
@@ -212,6 +212,8 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
   const pausedAtMsRef = useRef(null);
   const boundarySeenRef = useRef(false);
   const lastBoundaryAtMsRef = useRef(0);
+  const meanBoundaryDeltaMsRef = useRef(260);
+  const lastVisualEmitAtMsRef = useRef(0);
 
   const activeWordIndexRef = useRef(activeWordIndex);
   const currentWordIndexRef = useRef(0);
@@ -257,6 +259,7 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
       const bounded = clamp(index, 0, maxIndex);
       currentWordIndexRef.current = bounded;
       setCurrentWordIndex(bounded);
+      lastVisualEmitAtMsRef.current = Date.now();
 
       if (options.syncSeek) {
         setSeekWordIndex(bounded);
@@ -353,6 +356,8 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
       pausedAtMsRef.current = null;
       boundarySeenRef.current = false;
       lastBoundaryAtMsRef.current = 0;
+      meanBoundaryDeltaMsRef.current = 260;
+      lastVisualEmitAtMsRef.current = 0;
 
       setIsSeeking(false);
       setStatus(nextStatus);
@@ -402,6 +407,7 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
       playbackStartMsRef.current = startedAt;
       playbackBaseSecondsRef.current = segmentStartSeconds;
       playbackRateRef.current = utteranceRate;
+      lastVisualEmitAtMsRef.current = startedAt;
       pausedAtMsRef.current = null;
       boundarySeenRef.current = false;
       lastBoundaryAtMsRef.current = startedAt;
@@ -444,6 +450,8 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
 
       utterance.onboundary = (event) => {
         if (token !== utteranceTokenRef.current) return;
+        const boundaryType = String(event.name || '').toLowerCase();
+        if (boundaryType && boundaryType !== 'word') return;
         if (isSeekingRef.current || typeof event.charIndex !== 'number') return;
 
         const now = Date.now();
@@ -453,6 +461,14 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
         const previousCharIndex = lastBoundaryCharIndexRef.current || 0;
         const deltaChars = boundedCharIndex - previousCharIndex;
         const deltaMs = now - previousBoundaryAt;
+
+        if (deltaMs > 40 && deltaMs < 2000) {
+          meanBoundaryDeltaMsRef.current = clamp(
+            (meanBoundaryDeltaMsRef.current * 0.8) + (deltaMs * 0.2),
+            120,
+            1000,
+          );
+        }
 
         if (deltaChars > 0 && deltaMs > 80) {
           const observedRate = deltaChars / (deltaMs / 1000);
@@ -846,6 +862,11 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
 
     const tick = () => {
       const now = Date.now();
+      const minAdvanceIntervalMs = clamp(
+        (meanBoundaryDeltaMsRef.current * 0.72) / Math.max(playbackRateRef.current, 0.6),
+        120,
+        420,
+      );
 
       if (!playbackStartMsRef.current) {
         frameId = window.requestAnimationFrame(tick);
@@ -870,8 +891,10 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
         const anchorToken = normalizedWords[anchorWordIndex]?.texto || '';
         const punctuationHold = getTokenPauseHoldSeconds(anchorToken, playbackRateRef.current);
         const shouldHoldAtPunctuation = punctuationHold > 0 && deltaSeconds < punctuationHold;
+        const cadenceHoldSeconds = Math.min(0.55, (meanBoundaryDeltaMsRef.current / 1000) * 0.95);
+        const shouldHoldForCadence = boundarySeenRef.current && deltaSeconds < cadenceHoldSeconds;
 
-        if (shouldHoldAtPunctuation) {
+        if (shouldHoldAtPunctuation || shouldHoldForCadence) {
           nextIndex = currentWordIndexRef.current;
         } else {
           const effectiveDeltaSeconds = Math.max(0, deltaSeconds - punctuationHold);
@@ -911,6 +934,13 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
 
       if (nextIndex > currentWordIndexRef.current + 1) {
         nextIndex = currentWordIndexRef.current + 1;
+      }
+
+      if (nextIndex > currentWordIndexRef.current) {
+        const elapsedSinceVisualEmit = now - lastVisualEmitAtMsRef.current;
+        if (elapsedSinceVisualEmit < minAdvanceIntervalMs) {
+          nextIndex = currentWordIndexRef.current;
+        }
       }
 
       if (nextIndex !== currentWordIndexRef.current) {
@@ -1163,6 +1193,8 @@ const SpeechSynthesisPlayer = forwardRef(function SpeechSynthesisPlayer({
 });
 
 export default SpeechSynthesisPlayer;
+
+
 
 
 
